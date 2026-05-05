@@ -70,6 +70,8 @@ class AgentEndpoint(Base):
     body_schema: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     mode: Mapped[str] = mapped_column(String(16), nullable=False)
     idempotent: Mapped[bool] = mapped_column(default=False)
+    param_mapping: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    session_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     __table_args__ = (
         CheckConstraint("mode IN ('block', 'stream')", name="ck_mode"),
