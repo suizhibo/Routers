@@ -32,3 +32,8 @@ class SubjectMismatchError(AgentRoutersError):
 class ForbiddenError(AgentRoutersError):
     code = "forbidden"
     status_code = 403
+
+
+class ValidationError(AgentRoutersError):
+    code = "validation_error"
+    status_code = 400
