@@ -25,6 +25,7 @@ from agent_routers.errors import AgentRoutersError
 from agent_routers.services.forwarder import Forwarder
 from agent_routers.services.registry import AgentRegistry
 from agent_routers.services.routing import RoutingDecisionEngine
+from agent_routers.services.session_manager import SessionManager
 from agent_routers.services.signer import HmacSigner
 from agent_routers.services.coordination import init_coordination, get_registry
 from agent_routers.middleware.audit import AuditMiddleware, audit_task_set
@@ -51,10 +52,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     signer = HmacSigner()
     app.state.audit_repo = repo
     app.state.rule_repo = RuleRepository(_session_factory)
+    app.state.session_manager = SessionManager(settings.REDIS_URL)
     app.state.forwarder = Forwarder(
         agent_repo=AgentRepository(_session_factory),
         routing_engine=RoutingDecisionEngine(app.state.rule_repo),
         client_pool=get_client_pool(),
+        session_manager=app.state.session_manager,
     )
 
     _setup_middleware(app)
