@@ -27,6 +27,17 @@ class HTTPMethod(str, Enum):
     DELETE = "DELETE"
 
 
+class ParamMapping(BaseModel):
+    path_params: dict[str, str] = Field(default_factory=dict)
+    query_params: dict[str, str] = Field(default_factory=dict)
+    body: str | None = None
+
+
+class SessionConfig(BaseModel):
+    response_header: str | None = None
+    response_body_path: str | None = None
+
+
 class ParamSpec(BaseModel):
     name: str
     type: ParamType
@@ -48,6 +59,8 @@ class EndpointSpec(BaseModel):
     body_schema: dict | None = None
     mode: AgentMode
     idempotent: bool = False
+    param_mapping: ParamMapping = Field(default_factory=ParamMapping)
+    session_config: SessionConfig | None = None
 
 
 class AgentRegistration(BaseModel):
