@@ -27,3 +27,8 @@ class AgentConflictError(AgentRoutersError):
 class SubjectMismatchError(AgentRoutersError):
     code = "auth_invalid"
     status_code = 401
+
+
+class ForbiddenError(AgentRoutersError):
+    code = "forbidden"
+    status_code = 403
