@@ -1,0 +1,689 @@
+openapi: 3.1.0
+info:
+  title: AgentRouters
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      tags:
+      - health
+      summary: Liveness probe — always 200
+      operationId: liveness_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /readiness:
+    get:
+      tags:
+      - health
+      summary: Readiness probe — checks PG, Redis, JWKS
+      operationId: readiness_readiness_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v1/agents:
+    get:
+      tags:
+      - agents
+      summary: List all registered Agents
+      operationId: list_agents_v1_agents_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/AgentListItem'
+                type: array
+                title: Response List Agents V1 Agents Get
+    post:
+      tags:
+      - agents
+      summary: Register or re-register an Agent
+      operationId: register_agent_v1_agents_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRegistration'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRegistrationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/agents/{agent_id}:
+    get:
+      tags:
+      - agents
+      summary: Get Agent details with instances and endpoints
+      operationId: get_agent_v1_agents__agent_id__get
+      parameters:
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Agent Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - agents
+      summary: Deregister an Agent
+      operationId: deregister_agent_v1_agents__agent_id__delete
+      parameters:
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Agent Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/audit/{request_id}:
+    get:
+      tags:
+      - audit
+      summary: Get audit event by request ID (Admin only)
+      operationId: get_audit_event_v1_audit__request_id__get
+      parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/route:
+    post:
+      tags:
+      - route
+      summary: Forward request to target Agent endpoint
+      operationId: route_request_v1_route_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/rules:
+    get:
+      tags:
+      - rules
+      summary: List Rules
+      operationId: list_rules_v1_rules_get
+      parameters:
+      - name: request
+        in: query
+        required: true
+        schema:
+          title: Request
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoutingRuleDetail'
+                title: Response List Rules V1 Rules Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - rules
+      summary: Create Rule
+      operationId: create_rule_v1_rules_post
+      parameters:
+      - name: request
+        in: query
+        required: true
+        schema:
+          title: Request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutingRuleCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingRuleDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/rules/{rule_id}:
+    get:
+      tags:
+      - rules
+      summary: Get Rule
+      operationId: get_rule_v1_rules__rule_id__get
+      parameters:
+      - name: rule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Rule Id
+      - name: request
+        in: query
+        required: true
+        schema:
+          title: Request
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingRuleDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - rules
+      summary: Delete Rule
+      operationId: delete_rule_v1_rules__rule_id__delete
+      parameters:
+      - name: rule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Rule Id
+      - name: request
+        in: query
+        required: true
+        schema:
+          title: Request
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/requests/{request_id}/cancel:
+    post:
+      tags:
+      - cancel
+      summary: Cancel an in-flight request (creator or admin)
+      operationId: cancel_request_v1_requests__request_id__cancel_post
+      parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Request Id
+      - name: req
+        in: query
+        required: true
+        schema:
+          title: Req
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    AgentDetail:
+      properties:
+        agent_id:
+          type: string
+          title: Agent Id
+        name:
+          type: string
+          title: Name
+        subject:
+          type: string
+          title: Subject
+        instances:
+          items:
+            $ref: '#/components/schemas/InstanceInfo'
+          type: array
+          title: Instances
+        endpoints:
+          items:
+            $ref: '#/components/schemas/EndpointSpec'
+          type: array
+          title: Endpoints
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - agent_id
+      - name
+      - subject
+      - instances
+      - endpoints
+      - created_at
+      - updated_at
+      title: AgentDetail
+    AgentListItem:
+      properties:
+        agent_id:
+          type: string
+          title: Agent Id
+        name:
+          type: string
+          title: Name
+        subject:
+          type: string
+          title: Subject
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - agent_id
+      - name
+      - subject
+      - created_at
+      title: AgentListItem
+    AgentMode:
+      type: string
+      enum:
+      - block
+      - stream
+      title: AgentMode
+    AgentRegistration:
+      properties:
+        agent_id:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Agent Id
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        subject:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Subject
+        instances:
+          items:
+            $ref: '#/components/schemas/InstanceInfo'
+          type: array
+          minItems: 1
+          title: Instances
+        endpoints:
+          items:
+            $ref: '#/components/schemas/EndpointSpec'
+          type: array
+          minItems: 1
+          title: Endpoints
+      type: object
+      required:
+      - agent_id
+      - name
+      - subject
+      - instances
+      - endpoints
+      title: AgentRegistration
+    AgentRegistrationResponse:
+      properties:
+        agent_id:
+          type: string
+          title: Agent Id
+        name:
+          type: string
+          title: Name
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - agent_id
+      - name
+      - created_at
+      title: AgentRegistrationResponse
+    EndpointSpec:
+      properties:
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        method:
+          $ref: '#/components/schemas/HTTPMethod'
+        path:
+          type: string
+          maxLength: 2048
+          minLength: 1
+          title: Path
+        path_params:
+          items:
+            $ref: '#/components/schemas/ParamSpec'
+          type: array
+          title: Path Params
+        query_params:
+          items:
+            $ref: '#/components/schemas/ParamSpec'
+          type: array
+          title: Query Params
+        body_schema:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Body Schema
+        mode:
+          $ref: '#/components/schemas/AgentMode'
+        idempotent:
+          type: boolean
+          title: Idempotent
+          default: false
+        operation_types:
+          items:
+            type: string
+          type: array
+          title: Operation Types
+        param_mapping:
+          $ref: '#/components/schemas/ParamMapping'
+        session_config:
+          anyOf:
+          - $ref: '#/components/schemas/SessionConfig'
+          - type: 'null'
+      type: object
+      required:
+      - endpoint_id
+      - method
+      - path
+      - mode
+      title: EndpointSpec
+    HTTPMethod:
+      type: string
+      enum:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      title: HTTPMethod
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    InstanceInfo:
+      properties:
+        instance_id:
+          type: string
+          title: Instance Id
+        base_url:
+          type: string
+          maxLength: 2048
+          minLength: 1
+          title: Base Url
+        weight:
+          type: integer
+          maximum: 100.0
+          minimum: 1.0
+          title: Weight
+          default: 1
+      type: object
+      required:
+      - instance_id
+      - base_url
+      title: InstanceInfo
+    ParamMapping:
+      properties:
+        path_params:
+          additionalProperties:
+            type: string
+          type: object
+          title: Path Params
+        query_params:
+          additionalProperties:
+            type: string
+          type: object
+          title: Query Params
+        body:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Body
+      type: object
+      title: ParamMapping
+    ParamSpec:
+      properties:
+        name:
+          type: string
+          title: Name
+        type:
+          $ref: '#/components/schemas/ParamType'
+        required:
+          type: boolean
+          title: Required
+      type: object
+      required:
+      - name
+      - type
+      - required
+      title: ParamSpec
+    ParamType:
+      type: string
+      enum:
+      - string
+      - int
+      - bool
+      - float
+      title: ParamType
+    RouteRequest:
+      properties:
+        input:
+          type: string
+          title: Input
+          default: ''
+        context:
+          additionalProperties: true
+          type: object
+          title: Context
+        options:
+          additionalProperties: true
+          type: object
+          title: Options
+      type: object
+      title: RouteRequest
+    RoutingRuleCreate:
+      properties:
+        rule_id:
+          type: string
+          title: Rule Id
+        priority:
+          type: integer
+          title: Priority
+        when_clause:
+          additionalProperties: true
+          type: object
+          title: When Clause
+        target_agent_id:
+          type: string
+          title: Target Agent Id
+        target_instance_id:
+          type: string
+          title: Target Instance Id
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+      type: object
+      required:
+      - rule_id
+      - priority
+      - when_clause
+      - target_agent_id
+      - target_instance_id
+      title: RoutingRuleCreate
+    RoutingRuleDetail:
+      properties:
+        rule_id:
+          type: string
+          title: Rule Id
+        priority:
+          type: integer
+          title: Priority
+        when_clause:
+          additionalProperties: true
+          type: object
+          title: When Clause
+        target_agent_id:
+          type: string
+          title: Target Agent Id
+        target_instance_id:
+          type: string
+          title: Target Instance Id
+        enabled:
+          type: boolean
+          title: Enabled
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - rule_id
+      - priority
+      - when_clause
+      - target_agent_id
+      - target_instance_id
+      - enabled
+      - created_at
+      title: RoutingRuleDetail
+    SessionConfig:
+      properties:
+        response_header:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Response Header
+        response_body_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Response Body Path
+      type: object
+      title: SessionConfig
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
