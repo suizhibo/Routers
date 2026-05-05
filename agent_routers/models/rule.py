@@ -16,5 +16,6 @@ class RoutingRule(Base):
     when_clause: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     target_agent_id: Mapped[str] = mapped_column(String(255), nullable=False)
     target_instance_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_endpoint_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)

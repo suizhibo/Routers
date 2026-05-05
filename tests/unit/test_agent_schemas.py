@@ -51,6 +51,7 @@ def test_endpoint_spec_with_session_config():
         method="POST",
         path="/api/chat/{session_id}",
         mode="stream",
+        operation_types=["chat"],
         param_mapping=ParamMapping(
             path_params={"session_id": "context.session_id"},
             body="input",
@@ -59,3 +60,4 @@ def test_endpoint_spec_with_session_config():
     )
     assert ep.session_config.response_header == "X-Session-ID"
     assert ep.param_mapping.path_params["session_id"] == "context.session_id"
+    assert ep.operation_types == ["chat"]

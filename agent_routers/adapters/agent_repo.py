@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import selectinload
 
 from agent_routers.models.agent import Agent, AgentInstance, AgentEndpoint
 from agent_routers.schemas.agent import AgentRegistration
@@ -42,6 +43,9 @@ class AgentRepository:
                         body_schema=ep.body_schema,
                         mode=ep.mode.value,
                         idempotent=ep.idempotent,
+                        param_mapping=ep.param_mapping.model_dump(),
+                        session_config=ep.session_config.model_dump() if ep.session_config else None,
+                        operation_types=list(ep.operation_types),
                     )
                 )
 
@@ -60,6 +64,18 @@ class AgentRepository:
         async with self._sf() as session:
             result = await session.execute(
                 select(Agent).order_by(Agent.created_at.desc())
+            )
+            return list(result.scalars().all())
+
+    async def list_all(self) -> list[Agent]:
+        async with self._sf() as session:
+            result = await session.execute(
+                select(Agent)
+                .options(
+                    selectinload(Agent.instances),
+                    selectinload(Agent.endpoints),
+                )
+                .order_by(Agent.created_at.desc())
             )
             return list(result.scalars().all())
 

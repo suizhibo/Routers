@@ -59,6 +59,7 @@ class EndpointSpec(BaseModel):
     body_schema: dict | None = None
     mode: AgentMode
     idempotent: bool = False
+    operation_types: list[str] = Field(default_factory=list)
     param_mapping: ParamMapping = Field(default_factory=ParamMapping)
     session_config: SessionConfig | None = None
 
