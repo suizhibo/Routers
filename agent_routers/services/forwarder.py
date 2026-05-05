@@ -12,11 +12,57 @@ from starlette.responses import Response, StreamingResponse
 from agent_routers.adapters.http_client import get_client_pool, PerAgentClientPool
 from agent_routers.adapters.agent_repo import AgentRepository
 from agent_routers.services.routing import InstanceTarget, RoutingDecisionEngine
-from agent_routers.errors import AgentNotFoundError, EndpointNotFoundError
+from agent_routers.errors import AgentNotFoundError, AgentUnavailableError, EndpointNotFoundError
+
+from purgatory.service._async.circuitbreaker import AsyncCircuitBreakerFactory
+from purgatory.service._async.unit_of_work import AsyncInMemoryUnitOfWork
 
 logger = logging.getLogger(__name__)
 
 IDEMPOTENT_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+class _CircuitBreakerWrapper:
+    """Wraps AsyncCircuitBreakerFactory to provide the is_open/record_failure/record_success API."""
+
+    def __init__(self, error_threshold: int = 5, recovery_timeout: float = 60.0):
+        self._uow = AsyncInMemoryUnitOfWork()
+        self._factory = AsyncCircuitBreakerFactory(
+            default_threshold=error_threshold,
+            default_ttl=recovery_timeout,
+            uow=self._uow,
+        )
+        self._initialized = False
+
+    async def _ensure_initialized(self) -> None:
+        if not self._initialized:
+            await self._factory.initialize()
+            self._initialized = True
+
+    async def is_open(self, key: str) -> bool:
+        await self._ensure_initialized()
+        breaker = await self._factory.get_breaker(key)
+        return breaker.context.state == "opened"
+
+    async def record_failure(self, key: str) -> None:
+        await self._ensure_initialized()
+        breaker = await self._factory.get_breaker(key)
+        breaker.context.mark_failure(1)
+
+    async def record_success(self, key: str) -> None:
+        await self._ensure_initialized()
+        breaker = await self._factory.get_breaker(key)
+        breaker.context.recover_failure()
+
+
+_cb = _CircuitBreakerWrapper(
+    error_threshold=5,
+    recovery_timeout=60.0,
+)
+
+
+def _circuit_key(agent_id: str, instance_id: str) -> str:
+    return f"{agent_id}:{instance_id}"
 
 
 def _retry_if_not_cancelled(retry_state: tenacity.RetryCallState) -> bool:
@@ -89,10 +135,14 @@ class Forwarder:
         url = endpoint.path
         body_bytes = await request.body()
 
+        key = _circuit_key(target.agent_id, target.instance_id)
+        if await _cb.is_open(key):
+            raise AgentUnavailableError(f"Circuit open for {key}")
+
         if endpoint.mode == "block":
-            return await self._forward_block(client, request.method, url, request.headers, body_bytes)
+            return await self._forward_block(client, request.method, url, request.headers, body_bytes, key)
         else:
-            return await self._forward_stream(client, request.method, url, request.headers, body_bytes, cancel_event)
+            return await self._forward_stream(client, request.method, url, request.headers, body_bytes, cancel_event, key)
 
     @tenacity.retry(
         stop=tenacity.stop_after_attempt(3),
@@ -107,8 +157,19 @@ class Forwarder:
         url: str,
         headers: dict,
         body: bytes,
+        circuit_key: str,
     ) -> Response:
-        upstream = await client.request(method, url, headers=headers, content=body)
+        try:
+            upstream = await client.request(method, url, headers=headers, content=body)
+        except httpx.HTTPStatusError as e:
+            if 500 <= e.response.status_code <= 599:
+                await _cb.record_failure(circuit_key)
+            raise
+        else:
+            if 500 <= upstream.status_code <= 599:
+                await _cb.record_failure(circuit_key)
+            else:
+                await _cb.record_success(circuit_key)
         upstream.raise_for_status()
         return Response(
             content=upstream.content,
@@ -124,6 +185,7 @@ class Forwarder:
         headers: dict,
         body: bytes,
         cancel_event: asyncio.Event | None,
+        circuit_key: str,
     ) -> StreamingResponse:
         async def generator() -> AsyncIterator[bytes]:
             try:

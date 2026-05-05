@@ -37,3 +37,8 @@ class ForbiddenError(AgentRoutersError):
 class ValidationError(AgentRoutersError):
     code = "validation_error"
     status_code = 400
+
+
+class AgentUnavailableError(AgentRoutersError):
+    code = "agent_unavailable"
+    status_code = 502
