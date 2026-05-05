@@ -14,7 +14,7 @@ from starlette.responses import Response, StreamingResponse
 from agent_routers.adapters.http_client import get_client_pool, PerAgentClientPool
 from agent_routers.adapters.agent_repo import AgentRepository
 from agent_routers.schemas.route import RouteRequest
-from agent_routers.services.routing import InstanceTarget, RoutingDecisionEngine
+from agent_routers.services.routing import RoutingDecisionEngine
 from agent_routers.services.session_manager import SessionManager
 from agent_routers.errors import AgentNotFoundError, AgentUnavailableError, EndpointNotFoundError
 
@@ -122,11 +122,15 @@ class Forwarder:
     async def forward(
         self,
         request: Request,
-        agent_id: str,
-        endpoint_id: str,
         route_req: RouteRequest,
         cancel_event: asyncio.Event | None,
     ) -> Response:
+        # 1. 5-level pipeline resolves agent + endpoint
+        agent_id, endpoint_id = await self._routing_engine.resolve(
+            route_req, dict(request.headers)
+        )
+
+        # 2. Fetch agent and endpoint
         agent = await self._agent_repo.get_by_id(agent_id)
         if agent is None:
             raise AgentNotFoundError(f"Agent '{agent_id}' not registered")
@@ -139,29 +143,13 @@ class Forwarder:
         if endpoint is None:
             raise EndpointNotFoundError(f"Endpoint '{endpoint_id}' not found on agent '{agent_id}'")
 
-        # Resolve session-based preferred instance
+        # 3. Use first instance's base_url directly (no instance selection)
+        if not agent.instances:
+            raise AgentUnavailableError(f"Agent '{agent_id}' has no instances")
+        base_url = agent.instances[0].base_url
+
+        # 4. Build URL from param_mapping
         req_dict = route_req.model_dump()
-        session_id = _extract_value(req_dict, "context.session_id")
-        preferred_instance = None
-        if session_id and self._session_manager:
-            preferred_instance = await self._session_manager.get_instance(agent_id, session_id)
-
-        preferred = request.headers.get("X-Preferred-Instance") or preferred_instance
-        client_ip = request.client.host if request.client else None
-        target = await self._routing_engine.select_instance(
-            agent_id=agent_id,
-            instances=list(agent.instances),
-            client_ip=client_ip,
-            preferred_instance=preferred,
-            request_headers=dict(request.headers),
-        )
-
-        client = self._pool.get(agent_id)
-        if client is None:
-            base_url = next(i.base_url for i in agent.instances if i.instance_id == target.instance_id)
-            client = self._pool.create(agent_id, base_url)
-
-        # Build URL from param_mapping
         mapping = endpoint.param_mapping
         path_params = {}
         if mapping:
@@ -177,27 +165,33 @@ class Forwarder:
                 if val is not None:
                     query_params[key] = str(val)
 
-        url = _build_url(endpoint.path, path_params, query_params)
+        url_path = _build_url(endpoint.path, path_params, query_params)
+        full_url = f"{base_url.rstrip('/')}/{url_path.lstrip('/')}"
 
-        # Build body
+        # 5. Build body
         body_bytes = b""
         if endpoint.method not in IDEMPOTENT_METHODS and mapping and mapping.get("body"):
             body_value = _extract_value(req_dict, mapping["body"])
             body_bytes = _serialize_body(body_value)
 
-        key = _circuit_key(target.agent_id, target.instance_id)
+        # 6. Circuit breaker
+        key = _circuit_key(agent_id, agent.instances[0].instance_id)
         if await _cb.is_open(key):
             raise AgentUnavailableError(f"Circuit open for {key}")
 
+        client = self._pool.get(agent_id)
+        if client is None:
+            client = self._pool.create(agent_id, base_url)
+
         if endpoint.mode == "block":
             return await self._forward_block(
-                client, endpoint.method, url, dict(request.headers), body_bytes, key,
-                endpoint, agent_id, target.instance_id,
+                client, endpoint.method, full_url, dict(request.headers), body_bytes, key,
+                endpoint, agent_id, agent.instances[0].instance_id,
             )
         else:
             return await self._forward_stream(
-                client, endpoint.method, url, dict(request.headers), body_bytes, cancel_event, key,
-                endpoint, agent_id, target.instance_id,
+                client, endpoint.method, full_url, dict(request.headers), body_bytes, cancel_event, key,
+                endpoint, agent_id, agent.instances[0].instance_id,
             )
 
     @tenacity.retry(
@@ -245,7 +239,7 @@ class Forwarder:
                     except Exception:
                         pass
             if session_id:
-                await self._session_manager.set_instance(agent_id, session_id, target_instance_id)
+                await self._session_manager.set_route(agent_id, session_id, endpoint.endpoint_id)
 
         upstream.raise_for_status()
         return Response(
@@ -275,7 +269,7 @@ class Forwarder:
                     if session_config and session_config.get("response_header") and self._session_manager:
                         session_id = upstream.headers.get(session_config["response_header"])
                         if session_id:
-                            await self._session_manager.set_instance(agent_id, session_id, target_instance_id)
+                            await self._session_manager.set_route(agent_id, session_id, endpoint.endpoint_id)
 
                     async for chunk in upstream.aiter_bytes():
                         if cancel_event is not None and cancel_event.is_set():
