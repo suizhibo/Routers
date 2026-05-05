@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Path, Request
 
 from agent_routers.api.dependencies import get_forwarder
+from agent_routers.services.coordination import get_registry
 from agent_routers.services.forwarder import Forwarder
 
 router = APIRouter(prefix="/v1/route", tags=["route"])
@@ -19,5 +20,8 @@ async def route_request(
     endpoint_id: str = Path(...),
     forwarder: Forwarder = Depends(get_forwarder),
 ):
-    cancel_event = getattr(request.state, "cancel_event", None)
-    return await forwarder.forward(request, agent_id, endpoint_id, cancel_event)
+    registry = get_registry()
+    request_id = getattr(request.state, "request_id", "")
+    async with registry.track(request_id) as cancel_event:
+        request.state.cancel_event = cancel_event
+        return await forwarder.forward(request, agent_id, endpoint_id, cancel_event)
