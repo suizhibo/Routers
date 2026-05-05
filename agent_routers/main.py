@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -25,10 +27,12 @@ from agent_routers.services.registry import AgentRegistry
 from agent_routers.services.routing import RoutingDecisionEngine
 from agent_routers.services.signer import HmacSigner
 from agent_routers.services.coordination import init_coordination, get_registry
-from agent_routers.middleware.request_id import RequestIdMiddleware
+from agent_routers.middleware.audit import AuditMiddleware, audit_task_set
 from agent_routers.middleware.jwt_auth import JWTAuthMiddleware
 from agent_routers.middleware.quota import QuotaMiddleware
-from agent_routers.middleware.audit import AuditMiddleware
+from agent_routers.middleware.request_id import RequestIdMiddleware
+
+logger = logging.getLogger(__name__)
 
 _engine = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
@@ -57,7 +61,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    # Shutdown sequence (§5.6):
+    # 1. Close per-agent HTTP clients so in-flight forwards stop cleanly
+    await get_client_pool().close_all()
+
+    # 2. Stop cancellation broadcaster (terminates the Pub/Sub listener task)
     await broadcaster.stop()
+
+    # 3. Drain pending audit writes so we don't lose recent events
+    if audit_task_set:
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*audit_task_set, return_exceptions=True),
+                timeout=settings.DRAIN_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "audit_drain_timeout",
+                extra={"pending": len(audit_task_set), "timeout_s": settings.DRAIN_TIMEOUT_SECONDS},
+            )
+
+    # 4. Dispose DB engine last so audit drain can write
     if _engine is not None:
         await _engine.dispose()
 
