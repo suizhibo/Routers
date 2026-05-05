@@ -1,90 +1,117 @@
 from __future__ import annotations
 
-import random
-from dataclasses import dataclass
+import logging
+from typing import Any
 
+from agent_routers.adapters.agent_repo import AgentRepository
 from agent_routers.adapters.rule_repo import RuleRepository
-from agent_routers.models.agent import AgentInstance
+from agent_routers.schemas.route import RouteRequest
+from agent_routers.services.session_manager import SessionManager
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass
-class InstanceTarget:
-    agent_id: str
-    instance_id: str
-    base_url: str
-    weight: int
+def _extract_value(data: dict, dot_path: str) -> Any:
+    if dot_path == "$":
+        return data
+    current = data
+    for part in dot_path.split("."):
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            return None
+    return current
+
+
+def _evaluate_when_clause(when_clause: dict, route_req: RouteRequest, headers: dict[str, str]) -> bool:
+    """Simple when_clause evaluator. Supports: header.*, context.*, options.*, input equality."""
+    req_dict = route_req.model_dump()
+    for key, expected in when_clause.items():
+        if key.startswith("header."):
+            header_key = key[7:]
+            actual = headers.get(header_key) or headers.get(header_key.lower())
+        elif key.startswith("context."):
+            actual = _extract_value(req_dict, key)
+        elif key.startswith("options."):
+            actual = _extract_value(req_dict, key)
+        elif key == "input":
+            actual = req_dict.get("input")
+        else:
+            actual = _extract_value(req_dict, key)
+        if actual != expected:
+            return False
+    return True
 
 
 class RoutingDecisionEngine:
-    def __init__(self, rule_repo: RuleRepository):
-        self._rule_repo = rule_repo
-
-    async def select_instance(
+    def __init__(
         self,
-        agent_id: str,
-        instances: list[AgentInstance],
-        client_ip: str | None,
-        preferred_instance: str | None,
-        request_headers: dict[str, str],
-    ) -> InstanceTarget:
-        if not instances:
-            from agent_routers.errors import AgentNotFoundError
-            raise AgentNotFoundError(f"No instances registered for agent '{agent_id}'")
+        rule_repo: RuleRepository,
+        agent_repo: AgentRepository,
+        session_manager: SessionManager,
+        default_agent_id: str = "",
+    ):
+        self._rule_repo = rule_repo
+        self._agent_repo = agent_repo
+        self._session_manager = session_manager
+        self._default_agent_id = default_agent_id
 
-        # Step 1: preferred header
-        if preferred_instance:
-            for inst in instances:
-                if inst.instance_id == preferred_instance:
-                    return InstanceTarget(
-                        agent_id=agent_id,
-                        instance_id=inst.instance_id,
-                        base_url=inst.base_url,
-                        weight=inst.weight,
-                    )
+    async def resolve(
+        self,
+        route_req: RouteRequest,
+        headers: dict[str, str],
+    ) -> tuple[str, str]:
+        req_dict = route_req.model_dump()
 
-        # Step 2: rule match
+        # L1: Preferred
+        preferred_agent = headers.get("X-Preferred-Agent")
+        preferred_endpoint = headers.get("X-Preferred-Endpoint")
+        if preferred_agent and preferred_endpoint:
+            logger.debug("routing_l1_preferred", extra={"agent": preferred_agent, "endpoint": preferred_endpoint})
+            return preferred_agent, preferred_endpoint
+
+        # L2: Cache
+        session_id = _extract_value(req_dict, "context.session_id")
+        if session_id and self._session_manager:
+            cached = await self._session_manager.get_route(session_id)
+            if cached:
+                logger.debug("routing_l2_cache", extra={"session_id": session_id, "route": cached})
+                return cached
+
+        # L3: Rule
         rules = await self._rule_repo.list_enabled()
         for rule in rules:
-            if rule.target_agent_id == agent_id:
-                for inst in instances:
-                    if inst.instance_id == rule.target_instance_id:
-                        return InstanceTarget(
-                            agent_id=agent_id,
-                            instance_id=inst.instance_id,
-                            base_url=inst.base_url,
-                            weight=inst.weight,
-                        )
+            if _evaluate_when_clause(rule.when_clause, route_req, headers):
+                agent_id = rule.target_agent_id
+                endpoint_id = rule.target_endpoint_id
+                if not endpoint_id:
+                    agent = await self._agent_repo.get_by_id(agent_id)
+                    if agent and agent.endpoints:
+                        endpoint_id = agent.endpoints[0].endpoint_id
+                if endpoint_id:
+                    logger.debug("routing_l3_rule", extra={"rule_id": rule.rule_id, "route": (agent_id, endpoint_id)})
+                    return agent_id, endpoint_id
 
-        # Step 3: default — weighted random with IP hash for session stickiness
-        return self._weighted_select(instances, client_ip)
+        # L4: Operation Match
+        operation = _extract_value(req_dict, "context.operation")
+        if not operation:
+            operation = _extract_value(req_dict, "options.action")
+        if operation:
+            agents = await self._agent_repo.list_all()
+            for agent in agents:
+                for ep in agent.endpoints:
+                    op_types = ep.operation_types or []
+                    if operation in op_types:
+                        logger.debug("routing_l4_operation", extra={"operation": operation, "route": (agent.agent_id, ep.endpoint_id)})
+                        return agent.agent_id, ep.endpoint_id
 
-    def _weighted_select(
-        self,
-        instances: list[AgentInstance],
-        client_ip: str | None,
-    ) -> InstanceTarget:
-        insts = list(instances)
-        weights = [i.weight for i in insts]
-        total = sum(weights)
+        # L5: Default
+        if self._default_agent_id:
+            agent = await self._agent_repo.get_by_id(self._default_agent_id)
+            if agent and agent.endpoints:
+                ep_id = agent.endpoints[0].endpoint_id
+                logger.debug("routing_l5_default", extra={"route": (self._default_agent_id, ep_id)})
+                return self._default_agent_id, ep_id
 
-        if client_ip and total > 0:
-            target = hash(client_ip) % total
-            cum = 0
-            for inst, w in zip(insts, weights):
-                cum += w
-                if target < cum:
-                    return InstanceTarget(
-                        agent_id=inst.agent_id,
-                        instance_id=inst.instance_id,
-                        base_url=inst.base_url,
-                        weight=inst.weight,
-                    )
-
-        # Fallback: weighted random
-        chosen = random.choices(insts, weights=weights)[0]
-        return InstanceTarget(
-            agent_id=chosen.agent_id,
-            instance_id=chosen.instance_id,
-            base_url=chosen.base_url,
-            weight=chosen.weight,
-        )
+        from agent_routers.errors import AgentNotFoundError
+        raise AgentNotFoundError("No route found for request")

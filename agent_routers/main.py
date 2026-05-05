@@ -39,28 +39,18 @@ _engine = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
+def _create_engine_and_session() -> async_sessionmaker[AsyncSession]:
+    global _engine, _session_factory
+    if _engine is None:
+        _engine = create_async_engine(settings.DATABASE_URL, echo=False)
+        _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
+    return _session_factory
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    global _engine, _session_factory
-    _engine = create_async_engine(settings.DATABASE_URL, echo=False)
-    _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
-
     registry, broadcaster = init_coordination(settings.REDIS_URL)
     await broadcaster.start(registry)
-
-    repo = AuditRepository(_session_factory)
-    signer = HmacSigner()
-    app.state.audit_repo = repo
-    app.state.rule_repo = RuleRepository(_session_factory)
-    app.state.session_manager = SessionManager(settings.REDIS_URL)
-    app.state.forwarder = Forwarder(
-        agent_repo=AgentRepository(_session_factory),
-        routing_engine=RoutingDecisionEngine(app.state.rule_repo),
-        client_pool=get_client_pool(),
-        session_manager=app.state.session_manager,
-    )
-
-    _setup_middleware(app)
 
     yield
 
@@ -90,9 +80,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def _setup_middleware(app: FastAPI) -> None:
-    """Add middleware after lifespan has initialized app.state."""
-    repo = app.state.audit_repo
+    """Add middleware before application startup."""
+    session_factory = _create_engine_and_session()
+    repo = AuditRepository(session_factory)
     signer = HmacSigner()
+    app.state.audit_repo = repo
+    app.state.rule_repo = RuleRepository(session_factory)
+    app.state.session_manager = SessionManager(settings.REDIS_URL)
+    app.state.forwarder = Forwarder(
+        agent_repo=AgentRepository(session_factory),
+        routing_engine=RoutingDecisionEngine(
+            rule_repo=app.state.rule_repo,
+            agent_repo=AgentRepository(session_factory),
+            session_manager=app.state.session_manager,
+            default_agent_id=settings.DEFAULT_AGENT_ID,
+        ),
+        client_pool=get_client_pool(),
+        session_manager=app.state.session_manager,
+    )
+    app.state.registry = AgentRegistry(AgentRepository(session_factory))
     app.add_middleware(AuditMiddleware, repo=repo, signer=signer)
     app.add_middleware(QuotaMiddleware)
     app.add_middleware(JWTAuthMiddleware)
@@ -127,6 +133,8 @@ def make_app() -> FastAPI:
     app.include_router(forward_router)
     app.include_router(rules_router)
     app.include_router(cancel_router)
+
+    _setup_middleware(app)
     return app
 
 
