@@ -8,7 +8,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -65,9 +65,9 @@ class AgentEndpoint(Base):
     endpoint_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     method: Mapped[str] = mapped_column(String(16), nullable=False)
     path: Mapped[str] = mapped_column(String(2048), nullable=False)
-    path_params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=list)
-    query_params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=list)
-    body_schema: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    path_params: Mapped[dict] = mapped_column(JSON, nullable=False, default=list)
+    query_params: Mapped[dict] = mapped_column(JSON, nullable=False, default=list)
+    body_schema: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     mode: Mapped[str] = mapped_column(String(16), nullable=False)
     idempotent: Mapped[bool] = mapped_column(default=False)
 
