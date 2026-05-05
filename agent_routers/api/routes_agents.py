@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Response, status
 
 from agent_routers.api.dependencies import get_auth, get_registry
+from agent_routers.adapters.http_client import get_client_pool
 from agent_routers.schemas.agent import (
     AgentDetail,
     AgentListItem,
@@ -26,7 +27,10 @@ async def register_agent(
     auth: AuthContext = Depends(get_auth),
     registry: AgentRegistry = Depends(get_registry),
 ) -> AgentRegistrationResponse:
-    return await registry.register(registration, jwt_subject=auth.sub)
+    result = await registry.register(registration, jwt_subject=auth.sub)
+    first_instance = registration.instances[0]
+    get_client_pool().create(registration.agent_id, first_instance.base_url)
+    return result
 
 
 @router.get(
@@ -63,4 +67,5 @@ async def deregister_agent(
     registry: AgentRegistry = Depends(get_registry),
     response: Response = None,
 ) -> None:
+    get_client_pool().destroy(agent_id)
     await registry.deregister(agent_id, jwt_subject=auth.sub, is_admin=auth.is_admin)

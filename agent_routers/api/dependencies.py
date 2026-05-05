@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from pydantic import BaseModel
 
+from agent_routers.services.forwarder import Forwarder
 from agent_routers.services.registry import AgentRegistry
 
 
@@ -23,3 +24,7 @@ def get_registry(request: Request) -> AgentRegistry:
 
 def get_auth(request: Request) -> AuthContext:
     return request.state.auth
+
+
+def get_forwarder(request: Request) -> Forwarder:
+    return request.app.state.forwarder
