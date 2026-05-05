@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from sqlalchemy import String, Integer, Boolean, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agent_routers.models.agent import Base
@@ -13,7 +13,7 @@ class RoutingRule(Base):
 
     rule_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     priority: Mapped[int] = mapped_column(Integer, nullable=False)
-    when_clause: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    when_clause: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     target_agent_id: Mapped[str] = mapped_column(String(255), nullable=False)
     target_instance_id: Mapped[str] = mapped_column(String(255), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
