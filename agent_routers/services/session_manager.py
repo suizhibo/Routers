@@ -19,28 +19,34 @@ class SessionManager:
             self._client = redis.from_url(self._redis_url, decode_responses=True)
         return self._client
 
-    async def get_instance(self, agent_id: str, session_id: str) -> str | None:
+    async def get_route(self, session_id: str) -> tuple[str, str] | None:
         if not session_id:
             return None
         try:
             client = await self._ensure_client()
-            return await client.get(f"session:{agent_id}:{session_id}")
+            value = await client.get(f"session:{session_id}")
+            if value:
+                parts = value.split(":", 1)
+                if len(parts) == 2:
+                    return parts[0], parts[1]
+            return None
         except Exception:
-            logger.exception("session_get_failed", extra={"agent_id": agent_id, "session_id": session_id})
+            logger.exception("session_get_failed", extra={"session_id": session_id})
             return None
 
-    async def set_instance(
+    async def set_route(
         self,
-        agent_id: str,
         session_id: str,
-        instance_id: str,
+        agent_id: str,
+        endpoint_id: str,
         ttl: int = DEFAULT_TTL,
     ) -> None:
-        if not session_id or not instance_id:
+        if not session_id or not agent_id or not endpoint_id:
             return
         try:
             client = await self._ensure_client()
-            await client.set(f"session:{agent_id}:{session_id}", instance_id, ex=ttl)
-            logger.info("session_set", extra={"agent_id": agent_id, "session_id": session_id, "instance_id": instance_id})
+            value = f"{agent_id}:{endpoint_id}"
+            await client.set(f"session:{session_id}", value, ex=ttl)
+            logger.info("session_set", extra={"session_id": session_id, "agent_id": agent_id, "endpoint_id": endpoint_id})
         except Exception:
-            logger.exception("session_set_failed", extra={"agent_id": agent_id, "session_id": session_id})
+            logger.exception("session_set_failed", extra={"session_id": session_id, "agent_id": agent_id})

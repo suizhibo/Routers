@@ -15,39 +15,39 @@ def mock_redis():
 
 
 @pytest.mark.asyncio
-async def test_get_instance_found(mock_redis):
-    mock_redis.get.return_value = "inst-a"
+async def test_get_route_found(mock_redis):
+    mock_redis.get.return_value = "agent-1:ep-chat"
     mgr = SessionManager("redis://localhost")
-    result = await mgr.get_instance("agent-1", "sess-123")
-    assert result == "inst-a"
-    mock_redis.get.assert_awaited_once_with("session:agent-1:sess-123")
+    result = await mgr.get_route("sess-123")
+    assert result == ("agent-1", "ep-chat")
+    mock_redis.get.assert_awaited_once_with("session:sess-123")
 
 
 @pytest.mark.asyncio
-async def test_get_instance_not_found(mock_redis):
+async def test_get_route_not_found(mock_redis):
     mock_redis.get.return_value = None
     mgr = SessionManager("redis://localhost")
-    result = await mgr.get_instance("agent-1", "sess-123")
+    result = await mgr.get_route("sess-123")
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_get_instance_empty_session_id(mock_redis):
+async def test_get_route_empty_session_id(mock_redis):
     mgr = SessionManager("redis://localhost")
-    result = await mgr.get_instance("agent-1", "")
+    result = await mgr.get_route("")
     assert result is None
     mock_redis.get.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_set_instance(mock_redis):
+async def test_set_route(mock_redis):
     mgr = SessionManager("redis://localhost")
-    await mgr.set_instance("agent-1", "sess-123", "inst-a", ttl=3600)
-    mock_redis.set.assert_awaited_once_with("session:agent-1:sess-123", "inst-a", ex=3600)
+    await mgr.set_route("sess-123", "agent-1", "ep-chat", ttl=3600)
+    mock_redis.set.assert_awaited_once_with("session:sess-123", "agent-1:ep-chat", ex=3600)
 
 
 @pytest.mark.asyncio
-async def test_set_instance_empty_session_id(mock_redis):
+async def test_set_route_empty_session_id(mock_redis):
     mgr = SessionManager("redis://localhost")
-    await mgr.set_instance("agent-1", "", "inst-a")
+    await mgr.set_route("", "agent-1", "ep-chat")
     mock_redis.set.assert_not_awaited()
