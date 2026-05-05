@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentRouters · 架构图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,300;1,14..32,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #edebe1;
+    --bg-warm: #e8e5da;
+    --surface: #f5f3eb;
+    --surface-hover: #faf8f2;
+
+    --text-primary: #1a1a18;
+    --text-secondary: #6b6961;
+    --text-tertiary: #9c9a90;
+
+    --border: #d4d1c7;
+    --border-light: #e0ddd4;
+
+    --accent-blue:   #3d5af1;
+    --accent-green:  #2d8a56;
+    --accent-amber:  #c47d1a;
+    --accent-purple: #7c4dff;
+    --accent-indigo: #4f57f1;
+    --accent-teal:   #1a8a7a;
+    --accent-red:    #d44332;
+    --accent-pink:   #d1478a;
+
+    --radius: 14px;
+    --radius-sm: 8px;
+    --shadow-sm: 0 1px 3px rgba(26,26,24,0.04), 0 1px 2px rgba(26,26,24,0.03);
+    --shadow-md: 0 4px 16px rgba(26,26,24,0.06), 0 2px 6px rgba(26,26,24,0.04);
+    --shadow-lg: 0 12px 40px rgba(26,26,24,0.08), 0 4px 12px rgba(26,26,24,0.04);
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 48px 32px 64px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 56px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease forwards;
+  }
+  .header h1 {
+    font-family: 'Inter', sans-serif;
+    font-size: 42px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    line-height: 1.15;
+  }
+  .header .tagline {
+    font-size: 15px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.02em;
+    font-weight: 400;
+  }
+  .header .tagline code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: var(--surface);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+  }
+
+  /* ── Canvas ── */
+  .canvas { max-width: 1060px; margin: 0 auto; }
+
+  /* ── Users Row ── */
+  .users-row {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.1s forwards;
+  }
+  .user-card {
+    text-align: center;
+    transition: transform var(--transition);
+    cursor: default;
+  }
+  .user-card:hover { transform: translateY(-3px); }
+  .user-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-size: 26px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition);
+    border: 2px solid var(--bg);
+  }
+  .user-card:hover .user-avatar { box-shadow: var(--shadow-md); }
+  .avatar-client  { background: linear-gradient(145deg, #e3f2fd, #bbdefb); }
+  .avatar-admin   { background: linear-gradient(145deg, #fce4ec, #f8bbd0); }
+  .avatar-agent   { background: linear-gradient(145deg, #ede7f6, #d1c4e9); }
+  .avatar-agentsse{ background: linear-gradient(145deg, #e0f2f1, #b2dfdb); }
+  .user-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+  .user-desc {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    max-width: 160px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* ── Flow Arrow (vertical) ── */
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    position: relative;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.2s forwards;
+  }
+  .flow-arrow .arrow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .flow-arrow .line {
+    width: 1.5px;
+    height: 24px;
+    background: var(--border);
+  }
+  .flow-arrow .arrow-head {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--border);
+  }
+  .flow-arrow .label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-left: 14px;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Section ── */
+  .section {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 32px 28px 26px;
+    margin-bottom: 6px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition);
+  }
+  .section:hover { box-shadow: var(--shadow-md); }
+
+  .section-tag {
+    position: absolute;
+    top: -11px;
+    left: 28px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 14px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .tag-inbound  { background: #eef2ff; color: var(--accent-blue);   border-color: #c7d2fe; }
+  .tag-core     { background: #f3e8ff; color: var(--accent-purple); border-color: #ddd6fe; }
+  .tag-cross    { background: #fffbeb; color: var(--accent-amber);  border-color: #fde68a; }
+  .tag-infra    { background: #ecfdf5; color: var(--accent-green);  border-color: #a7f3d0; }
+
+  /* Staggered entrance per section */
+  .section-1 { opacity: 0; animation: fadeUp 0.8s ease 0.3s forwards; }
+  .section-2 { opacity: 0; animation: fadeUp 0.8s ease 0.5s forwards; }
+  .section-3 { opacity: 0; animation: fadeUp 0.8s ease 0.7s forwards; }
+  .section-4 { opacity: 0; animation: fadeUp 0.8s ease 0.9s forwards; }
+
+  /* ── Cards Row ── */
+  .cards-row {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  /* ── Card ── */
+  .card {
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
+    background: var(--surface-hover);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    transition: all var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    opacity: 0.85;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border);
+  }
+
+  .card-icon  { font-size: 22px; margin-bottom: 8px; display: block; }
+  .card-title { font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 600; margin-bottom: 2px; }
+  .card-route { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-tertiary); margin-bottom: 14px; letter-spacing: 0.02em; }
+
+  .card-list { list-style: none; font-size: 12.5px; color: var(--text-secondary); line-height: 1.7; }
+  .card-list li { display: flex; align-items: baseline; gap: 8px; }
+  .card-list li::before { content: ''; width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
+
+  /* Card color themes */
+  .card-web::before    { background: var(--accent-blue); }
+  .card-web .card-title { color: var(--accent-blue); }
+  .card-web .card-list li::before { background: var(--accent-blue); }
+
+  .card-api::before    { background: var(--accent-green); }
+  .card-api .card-title { color: var(--accent-green); }
+  .card-api .card-list li::before { background: var(--accent-green); }
+
+  .card-db::before     { background: var(--accent-amber); }
+  .card-db .card-title  { color: var(--accent-amber); }
+  .card-db .card-list li::before { background: var(--accent-amber); }
+
+  .card-git::before    { background: var(--accent-purple); }
+  .card-git .card-title { color: var(--accent-purple); }
+  .card-git .card-list li::before { background: var(--accent-purple); }
+
+  .card-cli::before    { background: var(--accent-indigo); }
+  .card-cli .card-title { color: var(--accent-indigo); }
+  .card-cli .card-list li::before { background: var(--accent-indigo); }
+
+  .card-feishu::before    { background: var(--accent-teal); }
+  .card-feishu .card-title { color: var(--accent-teal); }
+  .card-feishu .card-list li::before { background: var(--accent-teal); }
+
+  .card-red::before    { background: var(--accent-red); }
+  .card-red .card-title { color: var(--accent-red); }
+  .card-red .card-list li::before { background: var(--accent-red); }
+
+  .card-pink::before    { background: var(--accent-pink); }
+  .card-pink .card-title { color: var(--accent-pink); }
+  .card-pink .card-list li::before { background: var(--accent-pink); }
+
+  /* ── Horizontal connector ── */
+  .h-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    flex-shrink: 0;
+  }
+  .h-connector .h-line {
+    width: 100%;
+    height: 1.5px;
+    background: var(--border);
+    position: relative;
+  }
+  .h-connector .h-line::after {
+    content: '';
+    position: absolute;
+    right: -1px; top: -3.5px;
+    width: 0; height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid var(--border);
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 32px;
+    flex-wrap: wrap;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 1.0s forwards;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.02em;
+  }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    body { padding: 24px 16px 48px; }
+    .header h1 { font-size: 32px; }
+    .users-row { gap: 20px; }
+    .cards-row { flex-direction: column; align-items: center; }
+    .card { max-width: 100%; min-width: 0; width: 100%; }
+    .h-connector { display: none; }
+    .section { padding: 28px 20px 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>AgentRouters</h1>
+  <p class="tagline">多 Agent HTTP 路由网关 · 分层架构概览 · <code>v0.1 MVP</code></p>
+</div>
+
+<div class="canvas">
+
+  <!-- ── 角色 ── -->
+  <div class="users-row">
+    <div class="user-card">
+      <div class="user-avatar avatar-client">📱</div>
+      <div class="user-name">Client App</div>
+      <div class="user-desc">JWT / API Key<br/>mode: stream | block</div>
+    </div>
+    <div class="user-card">
+      <div class="user-avatar avatar-admin">🛠</div>
+      <div class="user-name">Admin / DevOps</div>
+      <div class="user-desc">RBAC: admin<br/>管理 Agent/规则/配额</div>
+    </div>
+    <div class="user-card">
+      <div class="user-avatar avatar-agent">🤖</div>
+      <div class="user-name">Agent (block)</div>
+      <div class="user-desc">同步 JSON Agent<br/>自注册 + 心跳</div>
+    </div>
+    <div class="user-card">
+      <div class="user-avatar avatar-agentsse">🌊</div>
+      <div class="user-name">Agent (AG-UI)</div>
+      <div class="user-desc">SSE 流式 Agent<br/>RUN_STARTED → events</div>
+    </div>
+  </div>
+
+  <!-- 入口箭头 -->
+  <div class="flow-arrow">
+    <div class="arrow-col">
+      <div class="line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <span class="label">HTTP / HTTPS · L7</span>
+  </div>
+
+  <!-- ── Section 1 — Inbound 入站层 ── -->
+  <div class="section section-1">
+    <div class="section-tag tag-inbound">Inbound · 入站层</div>
+    <div class="cards-row">
+
+      <div class="card card-web">
+        <span class="card-icon">🌐</span>
+        <div class="card-title">API 入口</div>
+        <div class="card-route">src/api/</div>
+        <ul class="card-list">
+          <li>routes · schemas</li>
+          <li>FastAPI deps</li>
+          <li>/route · /admin · /agents</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-api">
+        <span class="card-icon">🔐</span>
+        <div class="card-title">鉴权</div>
+        <div class="card-route">src/auth/</div>
+        <ul class="card-list">
+          <li>JWT(JWKS)</li>
+          <li>API Key</li>
+          <li>Agent Token</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-git">
+        <span class="card-icon">🛡️</span>
+        <div class="card-title">RBAC</div>
+        <div class="card-route">src/rbac/</div>
+        <ul class="card-list">
+          <li>角色 ∩ 端点</li>
+          <li>admin / agent / user</li>
+          <li>租户隔离</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-db">
+        <span class="card-icon">⏱️</span>
+        <div class="card-title">配额限流</div>
+        <div class="card-route">src/quota/</div>
+        <ul class="card-list">
+          <li>滑动窗口</li>
+          <li>1m / 1h / 1d</li>
+          <li>Redis ZSET</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <div class="arrow-col">
+      <div class="line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <span class="label">middleware → handler</span>
+  </div>
+
+  <!-- ── Section 2 — Core 业务层 ── -->
+  <div class="section section-2">
+    <div class="section-tag tag-core">Core · 业务层</div>
+    <div class="cards-row">
+
+      <div class="card card-web">
+        <span class="card-icon">🧭</span>
+        <div class="card-title">路由决策</div>
+        <div class="card-route">src/routing/</div>
+        <ul class="card-list">
+          <li>5 级流水线</li>
+          <li>preferred → cache → rule</li>
+          <li>LLM Judge → default</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-api">
+        <span class="card-icon">📒</span>
+        <div class="card-title">Agent 注册中心</div>
+        <div class="card-route">src/registry/</div>
+        <ul class="card-list">
+          <li>一致性哈希环</li>
+          <li>静态 + 自注册</li>
+          <li>心跳 + 探测</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-cli">
+        <span class="card-icon">🔀</span>
+        <div class="card-title">协议桥</div>
+        <div class="card-route">src/protocol/ + adapter/</div>
+        <ul class="card-list">
+          <li>4 象限适配</li>
+          <li>直通 / 重放 / 聚合 / 代理</li>
+          <li>熔断 + 重试</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-feishu">
+        <span class="card-icon">🧩</span>
+        <div class="card-title">会话与跟踪</div>
+        <div class="card-route">src/session/ + tracker/</div>
+        <ul class="card-list">
+          <li>消息持久化</li>
+          <li>跨实例取消</li>
+          <li>Pub/Sub 协调</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <div class="arrow-col">
+      <div class="line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <span class="label">cross-cutting injection</span>
+  </div>
+
+  <!-- ── Section 3 — 横切层 ── -->
+  <div class="section section-3">
+    <div class="section-tag tag-cross">Cross-cutting · 横切层</div>
+    <div class="cards-row">
+
+      <div class="card card-red">
+        <span class="card-icon">🔏</span>
+        <div class="card-title">审计日志</div>
+        <div class="card-route">src/audit/</div>
+        <ul class="card-list">
+          <li>HMAC-SHA256 签名</li>
+          <li>异步落库</li>
+          <li>request/response 全留痕</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-git">
+        <span class="card-icon">🔑</span>
+        <div class="card-title">加密</div>
+        <div class="card-route">src/crypto/</div>
+        <ul class="card-list">
+          <li>AES-256-GCM</li>
+          <li>主密钥 .env</li>
+          <li>headers 字段加密</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-pink">
+        <span class="card-icon">📊</span>
+        <div class="card-title">可观测性</div>
+        <div class="card-route">src/obs/</div>
+        <ul class="card-list">
+          <li>Prometheus 指标</li>
+          <li>structlog JSON</li>
+          <li>OpenTelemetry trace</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <div class="arrow-col">
+      <div class="line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <span class="label">persistence · external I/O</span>
+  </div>
+
+  <!-- ── Section 4 — Infra & External ── -->
+  <div class="section section-4">
+    <div class="section-tag tag-infra">Infra · 基础设施 / 外部依赖</div>
+    <div class="cards-row">
+
+      <div class="card card-red">
+        <span class="card-icon">⚡</span>
+        <div class="card-title">Redis</div>
+        <div class="card-route">cache · pub/sub</div>
+        <ul class="card-list">
+          <li>决策缓存 (TTL 1h)</li>
+          <li>Hash Ring · 配额窗口</li>
+          <li>tracker:cancel 通道</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-db">
+        <span class="card-icon">🗄️</span>
+        <div class="card-title">PostgreSQL</div>
+        <div class="card-route">db/ + alembic</div>
+        <ul class="card-list">
+          <li>agents · sessions</li>
+          <li>messages · audit_events</li>
+          <li>bootstrap_tokens</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-pink">
+        <span class="card-icon">🧠</span>
+        <div class="card-title">LLM Judge</div>
+        <div class="card-route">external · OpenAI 兼容</div>
+        <ul class="card-list">
+          <li>judge prompt</li>
+          <li>capabilities → agent_type</li>
+          <li>超时 + 兜底</li>
+        </ul>
+      </div>
+      <div class="h-connector"><div class="h-line"></div></div>
+
+      <div class="card card-cli">
+        <span class="card-icon">👤</span>
+        <div class="card-title">User Service</div>
+        <div class="card-route">external · JWKS</div>
+        <ul class="card-list">
+          <li>JWT 公钥</li>
+          <li>身份 / 角色解析</li>
+          <li>RBAC 数据源</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Legend ── -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-blue)"></div>入站</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-purple)"></div>核心 / 加密</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-green)"></div>注册 / Infra</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-amber)"></div>限流 / 持久化</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-indigo)"></div>协议桥 / 外部</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-teal)"></div>会话跟踪</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-red)"></div>审计 / Redis</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-pink)"></div>可观测 / LLM</div>
+  </div>
+
+</div>
+
+</body>
+</html>
