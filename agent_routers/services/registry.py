@@ -58,7 +58,7 @@ class AgentRegistry:
         for ep in agent.endpoints:
             endpoints.append(
                 EndpointSpec(
-                    endpoint_id=ep.endpoint_id,
+                    endpoint_type=ep.endpoint_type,
                     method=ep.method,
                     path=ep.path,
                     path_params=ep.path_params,
@@ -66,6 +66,8 @@ class AgentRegistry:
                     body_schema=ep.body_schema,
                     mode=ep.mode,
                     idempotent=ep.idempotent,
+                    param_mapping=ep.param_mapping,
+                    session_config=ep.session_config,
                 )
             )
 

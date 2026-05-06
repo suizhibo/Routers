@@ -17,7 +17,6 @@ class AuditRepository:
                 timestamp=datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00")),
                 user_subject=event["user_subject"],
                 agent_id=event.get("agent_id") or None,
-                endpoint_id=event.get("endpoint_id") or None,
                 instance_id=event.get("instance_id") or None,
                 method=event.get("method") or None,
                 status_code=event.get("status_code"),

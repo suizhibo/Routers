@@ -35,7 +35,7 @@ class AgentRepository:
                 session.add(
                     AgentEndpoint(
                         agent_id=registration.agent_id,
-                        endpoint_id=ep.endpoint_id,
+                        endpoint_type=ep.endpoint_type,
                         method=ep.method.value,
                         path=ep.path,
                         path_params=[p.model_dump() for p in ep.path_params],

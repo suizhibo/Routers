@@ -30,7 +30,7 @@ async def test_register_success(registry, mock_repo):
         name="Test Agent",
         subject="svc-test",
         instances=[InstanceInfo(instance_id="i1", base_url="http://localhost:8000")],
-        endpoints=[EndpointSpec(endpoint_id="e1", method="GET", path="/", mode="block")],
+        endpoints=[EndpointSpec(endpoint_type="chat", method="GET", path="/", mode="block")],
     )
     result = await registry.register(reg, jwt_subject="svc-test")
     assert result.agent_id == "test-agent"
@@ -44,7 +44,7 @@ async def test_register_subject_mismatch_raises(registry):
         name="Test Agent",
         subject="svc-other",
         instances=[InstanceInfo(instance_id="i1", base_url="http://localhost:8000")],
-        endpoints=[EndpointSpec(endpoint_id="e1", method="GET", path="/", mode="block")],
+        endpoints=[EndpointSpec(endpoint_type="chat", method="GET", path="/", mode="block")],
     )
     with pytest.raises(SubjectMismatchError):
         await registry.register(reg, jwt_subject="svc-mismatch")
