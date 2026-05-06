@@ -46,7 +46,7 @@ def _make_agent_with_create_session() -> Agent:
     agent.endpoints = [
         AgentEndpoint(
             agent_id="weather-agent",
-            endpoint_id="create-session",
+            endpoint_type="create_session",
             method="POST",
             path="/sessions",
             path_params=[],
@@ -59,7 +59,7 @@ def _make_agent_with_create_session() -> Agent:
         ),
         AgentEndpoint(
             agent_id="weather-agent",
-            endpoint_id="chat",
+            endpoint_type="chat",
             method="POST",
             path="/chat/{session_id}",
             path_params=[],

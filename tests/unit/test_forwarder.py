@@ -46,7 +46,7 @@ def _make_agent(endpoint_mode: str = "block", param_mapping=None, session_config
     agent.endpoints = [
         AgentEndpoint(
             agent_id="agent-1",
-            endpoint_id="chat",
+            endpoint_type="chat",
             method="POST",
             path="/chat",
             path_params=[],

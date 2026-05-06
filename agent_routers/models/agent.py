@@ -69,7 +69,7 @@ class AgentEndpoint(Base):
     agent_id: Mapped[str] = mapped_column(
         String(255), ForeignKey("agents.agent_id", ondelete="CASCADE"), primary_key=True
     )
-    endpoint_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    endpoint_type: Mapped[str] = mapped_column(String(16), primary_key=True)
     method: Mapped[str] = mapped_column(String(16), nullable=False)
     path: Mapped[str] = mapped_column(String(2048), nullable=False)
     path_params: Mapped[dict] = mapped_column(JSON, nullable=False, default=list)

@@ -37,12 +37,12 @@ class FakeSessionManager:
         return self._route
 
 
-def _make_agent(agent_id: str, endpoint_id: str) -> Agent:
+def _make_agent(agent_id: str, endpoint_type: str) -> Agent:
     agent = Agent(agent_id=agent_id, name=f"Agent {agent_id}", subject=f"sub-{agent_id}")
     agent.endpoints = [
         AgentEndpoint(
             agent_id=agent_id,
-            endpoint_id=endpoint_id,
+            endpoint_type=endpoint_type,
             method="POST",
             path="/api/chat",
             path_params=[],
