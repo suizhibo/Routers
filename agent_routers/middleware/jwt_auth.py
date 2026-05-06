@@ -6,7 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from agent_routers.adapters.jwks import get_jwks_client
+from agent_routers.adapters.jwks import verify_token
 from agent_routers.api.dependencies import AuthContext
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
         token = auth_header[7:]
         try:
-            client = get_jwks_client()
-            claims = client.verify_or_use_cached(token)
+            claims = verify_token(token)
         except jwt.InvalidTokenError as e:
             logger.warning("jwt_verify_failed", extra={"reason": str(e)})
             return JSONResponse(

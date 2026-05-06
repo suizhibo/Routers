@@ -106,7 +106,7 @@ def _setup_middleware(app: FastAPI) -> None:
 
 
 def make_app() -> FastAPI:
-    app = FastAPI(title="AgentRouters", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="AgentRouters", version="0.1.0", lifespan=lifespan, docs_url="/docs" if settings.DEV_MODE else None)
 
     @app.exception_handler(AgentRoutersError)
     async def agent_routers_error_handler(request: Request, exc: AgentRoutersError) -> JSONResponse:
@@ -139,3 +139,7 @@ def make_app() -> FastAPI:
 
 
 app = make_app()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
