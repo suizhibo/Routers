@@ -58,7 +58,7 @@ async def test_register_agent(client):
         ],
         "endpoints": [
             {
-                "endpoint_id": "forecast",
+                "endpoint_type": "chat",
                 "method": "POST",
                 "path": "/api/forecast",
                 "mode": "block",
@@ -82,7 +82,7 @@ async def test_register_subject_mismatch(client):
         "subject": "svc-wrong",
         "instances": [{"instance_id": "i1", "base_url": "http://x:80"}],
         "endpoints": [
-            {"endpoint_id": "e1", "method": "GET", "path": "/", "mode": "block"}
+            {"endpoint_type": "chat", "method": "GET", "path": "/", "mode": "block"}
         ],
     }
     resp = await client.post("/v1/agents", json=payload)
