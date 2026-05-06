@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
@@ -16,6 +17,12 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
+
+
+class EndpointType(str, Enum):
+    CHAT = "chat"
+    CREATE_SESSION = "create_session"
+    STOP = "stop"
 
 
 class Base(AsyncAttrs, DeclarativeBase):
