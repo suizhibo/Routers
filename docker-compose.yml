@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agent_routers
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mock-jwks:
+    build:
+      context: .
+      dockerfile: Dockerfile.jwks
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/.well-known/jwks.json || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agent_routers
+      REDIS_URL: redis://redis:6379/0
+      JWKS_URL: http://host.docker.internal:8080/.well-known/jwks.json
+      JWT_ISS: http://test-issuer
+      JWT_AUD: agent-routers
+      AUDIT_HMAC_KEY: test-hmac-key
+      QUOTA_DEFAULT_PER_MINUTE: 120
+      DRAIN_TIMEOUT_SECONDS: 15
+      DEFAULT_AGENT_ID: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mock-jwks:
+        condition: service_healthy
