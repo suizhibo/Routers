@@ -43,14 +43,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         timestamp = datetime.utcnow().isoformat()
 
         agent_id = request.path_params.get("agent_id", "")
-        endpoint_id = request.path_params.get("endpoint_id", "")
 
         canonical = self._signer.canonical(
             request_id=request_id,
             timestamp_iso=timestamp,
             user_subject=user_subject,
             agent_id=agent_id,
-            endpoint_id=endpoint_id,
             status_code=response.status_code,
             latency_ms=latency_ms,
         )
@@ -61,7 +59,6 @@ class AuditMiddleware(BaseHTTPMiddleware):
             "timestamp": timestamp,
             "user_subject": user_subject,
             "agent_id": agent_id,
-            "endpoint_id": endpoint_id,
             "instance_id": "",
             "method": request.method,
             "status_code": response.status_code,

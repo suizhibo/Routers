@@ -31,7 +31,6 @@ async def get_audit_event(
         "timestamp": event.timestamp.isoformat(),
         "user_subject": event.user_subject,
         "agent_id": event.agent_id,
-        "endpoint_id": event.endpoint_id,
         "instance_id": event.instance_id,
         "method": event.method,
         "status_code": event.status_code,
