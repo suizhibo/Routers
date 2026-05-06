@@ -1,5 +1,5 @@
 import pytest
-from agent_routers.schemas.agent import AgentRegistration, InstanceInfo, EndpointSpec, ParamMapping, SessionConfig
+from agent_routers.schemas.agent import AgentRegistration, EndpointSpec, ParamMapping, SessionConfig
 
 
 def test_agent_registration_valid():
@@ -7,9 +7,7 @@ def test_agent_registration_valid():
         agent_id="weather-agent",
         name="Weather Agent",
         subject="svc-weather",
-        instances=[
-            InstanceInfo(instance_id="i1", base_url="https://weather-svc:8080", weight=2),
-        ],
+        base_url="https://weather-svc:8080",
         endpoints=[
             EndpointSpec(
                 endpoint_type="chat",
@@ -23,25 +21,18 @@ def test_agent_registration_valid():
         ],
     )
     assert reg.agent_id == "weather-agent"
-    assert reg.instances[0].weight == 2
+    assert reg.base_url == "https://weather-svc:8080"
     assert reg.endpoints[0].param_mapping.body is None
 
 
-def test_agent_registration_rejects_empty_instances():
+def test_agent_registration_rejects_empty_endpoints():
     with pytest.raises(ValueError):
         AgentRegistration(
             agent_id="bad-agent",
             name="Bad Agent",
             subject="svc-bad",
-            instances=[],
-            endpoints=[
-                EndpointSpec(
-                    endpoint_type="chat",
-                    method="GET",
-                    path="/",
-                    mode="block",
-                ),
-            ],
+            base_url="http://localhost:8001",
+            endpoints=[],
         )
 
 

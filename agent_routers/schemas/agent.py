@@ -44,12 +44,6 @@ class ParamSpec(BaseModel):
     required: bool
 
 
-class InstanceInfo(BaseModel):
-    instance_id: str
-    base_url: Annotated[str, Field(min_length=1, max_length=2048)]
-    weight: int = Field(default=1, ge=1, le=100)
-
-
 class EndpointSpec(BaseModel):
     endpoint_type: str
     method: HTTPMethod
@@ -68,7 +62,7 @@ class AgentRegistration(BaseModel):
     agent_id: str = Field(min_length=1, max_length=255)
     name: str = Field(min_length=1, max_length=255)
     subject: str = Field(min_length=1, max_length=255)
-    instances: Annotated[list[InstanceInfo], Field(min_length=1)]
+    base_url: Annotated[str, Field(min_length=1, max_length=2048)]
     endpoints: Annotated[list[EndpointSpec], Field(min_length=1)]
 
 
@@ -84,7 +78,7 @@ class AgentDetail(BaseModel):
     agent_id: str
     name: str
     subject: str
-    instances: list[InstanceInfo]
+    base_url: str
     endpoints: list[EndpointSpec]
     created_at: datetime
     updated_at: datetime

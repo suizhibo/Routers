@@ -10,7 +10,7 @@ from starlette.responses import Response, StreamingResponse
 
 from agent_routers.adapters.http_client import PerAgentClientPool
 from agent_routers.errors import AgentNotFoundError, EndpointNotFoundError
-from agent_routers.models.agent import Agent, AgentEndpoint, AgentInstance
+from agent_routers.models.agent import Agent, AgentEndpoint
 from agent_routers.schemas.route import RouteRequest
 from agent_routers.services.forwarder import Forwarder
 from agent_routers.services.routing import RoutingDecisionEngine
@@ -39,10 +39,8 @@ def _make_agent(endpoint_mode: str = "block", param_mapping=None, session_config
         agent_id="agent-1",
         name="Test Agent",
         subject="sub-1",
+        base_url="http://localhost:8001",
     )
-    agent.instances = [
-        AgentInstance(agent_id="agent-1", instance_id="inst-a", base_url="http://localhost:8001", weight=1),
-    ]
     agent.endpoints = [
         AgentEndpoint(
             agent_id="agent-1",

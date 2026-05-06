@@ -53,9 +53,7 @@ async def test_register_agent(client):
         "agent_id": "weather-agent",
         "name": "Weather Agent",
         "subject": "svc-test",
-        "instances": [
-            {"instance_id": "i1", "base_url": "http://weather:8080", "weight": 1}
-        ],
+        "base_url": "http://weather:8080",
         "endpoints": [
             {
                 "endpoint_type": "chat",
@@ -80,7 +78,7 @@ async def test_register_subject_mismatch(client):
         "agent_id": "agent-1",
         "name": "Agent 1",
         "subject": "svc-wrong",
-        "instances": [{"instance_id": "i1", "base_url": "http://x:80"}],
+        "base_url": "http://x:80",
         "endpoints": [
             {"endpoint_type": "chat", "method": "GET", "path": "/", "mode": "block"}
         ],

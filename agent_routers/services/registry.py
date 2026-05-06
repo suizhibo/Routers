@@ -7,7 +7,6 @@ from agent_routers.schemas.agent import (
     AgentListItem,
     AgentRegistration,
     AgentRegistrationResponse,
-    InstanceInfo,
     EndpointSpec,
 )
 
@@ -44,16 +43,6 @@ class AgentRegistry:
         if agent is None:
             raise AgentNotFoundError(f"Agent '{agent_id}' is not registered")
 
-        instances = []
-        for inst in agent.instances:
-            instances.append(
-                InstanceInfo(
-                    instance_id=inst.instance_id,
-                    base_url=inst.base_url,
-                    weight=inst.weight,
-                )
-            )
-
         endpoints = []
         for ep in agent.endpoints:
             endpoints.append(
@@ -75,7 +64,7 @@ class AgentRegistry:
             agent_id=agent.agent_id,
             name=agent.name,
             subject=agent.subject,
-            instances=instances,
+            base_url=agent.base_url,
             endpoints=endpoints,
             created_at=agent.created_at,
             updated_at=agent.updated_at,

@@ -75,9 +75,7 @@ async def run_tests():
             "agent_id": "test-agent-1",
             "name": "Test Agent",
             "subject": "test-subject",
-            "instances": [
-                {"instance_id": "inst-1", "base_url": "http://agent-backend:9001", "weight": 1}
-            ],
+            "base_url": "http://agent-backend:9001",
             "endpoints": [
                 {
                     "endpoint_id": "create_session",

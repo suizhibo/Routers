@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from agent_routers.adapters.http_client import PerAgentClientPool
-from agent_routers.models.agent import Agent, AgentEndpoint, AgentInstance
+from agent_routers.models.agent import Agent, AgentEndpoint
 from agent_routers.schemas.route import RouteRequest
 from agent_routers.services.forwarder import Forwarder
 from agent_routers.services.routing import RoutingDecisionEngine
@@ -39,10 +39,8 @@ def _make_agent_with_create_session() -> Agent:
         agent_id="weather-agent",
         name="Weather Agent",
         subject="svc-weather",
+        base_url="http://localhost:8001",
     )
-    agent.instances = [
-        AgentInstance(agent_id="weather-agent", instance_id="inst-1", base_url="http://localhost:8001", weight=1),
-    ]
     agent.endpoints = [
         AgentEndpoint(
             agent_id="weather-agent",

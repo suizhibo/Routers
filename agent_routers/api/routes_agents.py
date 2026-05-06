@@ -28,8 +28,7 @@ async def register_agent(
     registry: AgentRegistry = Depends(get_registry),
 ) -> AgentRegistrationResponse:
     result = await registry.register(registration, jwt_subject=auth.sub)
-    first_instance = registration.instances[0]
-    get_client_pool().create(registration.agent_id, first_instance.base_url)
+    get_client_pool().create(registration.agent_id, registration.base_url)
     return result
 
 

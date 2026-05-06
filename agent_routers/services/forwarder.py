@@ -206,7 +206,7 @@ class Forwarder:
         endpoint = self._find_endpoint(agent, "create_session")
 
         url_path, body_bytes = self._build_request(create_req, endpoint)
-        base_url = agent.instances[0].base_url
+        base_url = agent.base_url
         full_url = f"{base_url.rstrip('/')}/{url_path.lstrip('/')}"
 
         client = self._pool.get(agent_id)
@@ -254,7 +254,7 @@ class Forwarder:
 
         # Build request
         url_path, body_bytes = self._build_request(route_req, endpoint)
-        base_url = agent.instances[0].base_url
+        base_url = agent.base_url
         full_url = f"{base_url.rstrip('/')}/{url_path.lstrip('/')}"
 
         # 4. Circuit breaker

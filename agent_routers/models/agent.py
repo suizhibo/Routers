@@ -42,25 +42,10 @@ class Agent(Base):
         server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    instances: Mapped[list[AgentInstance]] = relationship(
-        back_populates="agent", cascade="all, delete-orphan"
-    )
+    base_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     endpoints: Mapped[list[AgentEndpoint]] = relationship(
         back_populates="agent", cascade="all, delete-orphan"
     )
-
-
-class AgentInstance(Base):
-    __tablename__ = "agent_instances"
-
-    agent_id: Mapped[str] = mapped_column(
-        String(255), ForeignKey("agents.agent_id", ondelete="CASCADE"), primary_key=True
-    )
-    instance_id: Mapped[str] = mapped_column(String(255), primary_key=True)
-    base_url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    weight: Mapped[int] = mapped_column(default=1)
-
-    agent: Mapped[Agent] = relationship(back_populates="instances")
 
 
 class AgentEndpoint(Base):

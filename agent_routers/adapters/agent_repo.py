@@ -4,7 +4,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from agent_routers.models.agent import Agent, AgentInstance, AgentEndpoint
+from agent_routers.models.agent import Agent, AgentEndpoint
 from agent_routers.schemas.agent import AgentRegistration
 
 
@@ -18,18 +18,9 @@ class AgentRepository:
                 agent_id=registration.agent_id,
                 name=registration.name,
                 subject=registration.subject,
+                base_url=registration.base_url,
             )
             session.add(agent)
-
-            for inst in registration.instances:
-                session.add(
-                    AgentInstance(
-                        agent_id=registration.agent_id,
-                        instance_id=inst.instance_id,
-                        base_url=inst.base_url,
-                        weight=inst.weight,
-                    )
-                )
 
             for ep in registration.endpoints:
                 session.add(
@@ -71,7 +62,6 @@ class AgentRepository:
             result = await session.execute(
                 select(Agent)
                 .options(
-                    selectinload(Agent.instances),
                     selectinload(Agent.endpoints),
                 )
                 .order_by(Agent.created_at.desc())

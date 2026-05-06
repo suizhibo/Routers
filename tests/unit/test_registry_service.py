@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock
 from agent_routers.services.registry import AgentRegistry
 from datetime import datetime, timezone
-from agent_routers.schemas.agent import AgentRegistration, InstanceInfo, EndpointSpec
+from agent_routers.schemas.agent import AgentRegistration, EndpointSpec
 from agent_routers.errors import SubjectMismatchError, AgentConflictError, AgentNotFoundError
 
 
@@ -29,7 +29,7 @@ async def test_register_success(registry, mock_repo):
         agent_id="test-agent",
         name="Test Agent",
         subject="svc-test",
-        instances=[InstanceInfo(instance_id="i1", base_url="http://localhost:8000")],
+        base_url="http://localhost:8000",
         endpoints=[EndpointSpec(endpoint_type="chat", method="GET", path="/", mode="block")],
     )
     result = await registry.register(reg, jwt_subject="svc-test")
@@ -43,7 +43,7 @@ async def test_register_subject_mismatch_raises(registry):
         agent_id="test-agent",
         name="Test Agent",
         subject="svc-other",
-        instances=[InstanceInfo(instance_id="i1", base_url="http://localhost:8000")],
+        base_url="http://localhost:8000",
         endpoints=[EndpointSpec(endpoint_type="chat", method="GET", path="/", mode="block")],
     )
     with pytest.raises(SubjectMismatchError):
