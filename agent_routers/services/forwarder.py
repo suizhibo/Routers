@@ -122,12 +122,12 @@ class Forwarder:
         self._session_manager = session_manager
 
     @staticmethod
-    def _find_endpoint(agent: Agent, endpoint_id: str) -> AgentEndpoint:
+    def _find_endpoint(agent: Agent, endpoint_type: str) -> AgentEndpoint:
         for ep in agent.endpoints:
-            if ep.endpoint_id == endpoint_id:
+            if ep.endpoint_type == endpoint_type:
                 return ep
         raise EndpointNotFoundError(
-            f"Endpoint '{endpoint_id}' not found on agent '{agent.agent_id}'"
+            f"Endpoint '{endpoint_type}' not found on agent '{agent.agent_id}'"
         )
 
     def _build_request(
@@ -203,7 +203,7 @@ class Forwarder:
         if not agent:
             raise AgentNotFoundError(f"Agent '{agent_id}' not found")
 
-        endpoint = self._find_endpoint(agent, "create-session")
+        endpoint = self._find_endpoint(agent, "create_session")
 
         url_path, body_bytes = self._build_request(create_req, endpoint)
         base_url = agent.instances[0].base_url
@@ -224,7 +224,7 @@ class Forwarder:
             raise AgentUnavailableError("Failed to extract session_id from create-session response")
 
         if self._session_manager:
-            await self._session_manager.set_route(agent_id, session_id, endpoint.endpoint_id)
+            await self._session_manager.set_route(session_id, agent_id)
 
         return session_id
 
@@ -237,7 +237,7 @@ class Forwarder:
         session_id = route_req.context.get("session_id")
 
         # Resolve agent once; session communication always uses "chat" endpoint
-        agent_id, _ = await self._routing_engine.resolve(
+        agent_id = await self._routing_engine.resolve(
             route_req, dict(request.headers)
         )
 

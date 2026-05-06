@@ -27,10 +27,10 @@ class FakeAgentRepo:
 
 
 class FakeRoutingEngine:
-    def __init__(self, result: tuple[str, str]):
+    def __init__(self, result: str):
         self._result = result
 
-    async def resolve(self, route_req: RouteRequest, headers: dict) -> tuple[str, str]:
+    async def resolve(self, route_req: RouteRequest, headers: dict) -> str:
         return self._result
 
 
@@ -98,7 +98,7 @@ async def test_auto_create_session_then_chat(pool):
     """测试无 session_id 时自动创建会话并继续 chat"""
     agent = _make_agent_with_create_session()
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("weather-agent", "chat"))
+    engine = FakeRoutingEngine("weather-agent")
     
     mock_session_mgr = AsyncMock(spec=SessionManager)
     fwd = Forwarder(repo, engine, pool, session_manager=mock_session_mgr)
@@ -140,7 +140,7 @@ async def test_auto_create_session_then_chat(pool):
         body += chunk
     
     assert mock_client.request.called
-    mock_session_mgr.set_route.assert_awaited_once_with("weather-agent", "sess-abc123", "create-session")
+    mock_session_mgr.set_route.assert_awaited_once_with("sess-abc123", "weather-agent")
     assert mock_client.stream.called
 
 
@@ -149,10 +149,10 @@ async def test_with_existing_session_id(pool):
     """测试有 session_id 时不自动创建"""
     agent = _make_agent_with_create_session()
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("weather-agent", "chat"))
+    engine = FakeRoutingEngine("weather-agent")
     
     mock_session_mgr = AsyncMock(spec=SessionManager)
-    mock_session_mgr.get_route = AsyncMock(return_value=("weather-agent", "chat"))
+    mock_session_mgr.get_route = AsyncMock(return_value="weather-agent")
     fwd = Forwarder(repo, engine, pool, session_manager=mock_session_mgr)
     
     async def _aiter_bytes():

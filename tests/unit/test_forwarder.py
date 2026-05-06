@@ -25,10 +25,10 @@ class FakeAgentRepo:
 
 
 class FakeRoutingEngine:
-    def __init__(self, result: tuple[str, str]):
+    def __init__(self, result: str):
         self._result = result
 
-    async def resolve(self, route_req: RouteRequest, headers: dict) -> tuple[str, str]:
+    async def resolve(self, route_req: RouteRequest, headers: dict) -> str:
         return self._result
 
 
@@ -84,14 +84,14 @@ def pool():
 def forwarder(pool):
     agent = _make_agent("block")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     return Forwarder(repo, engine, pool)
 
 
 @pytest.mark.asyncio
 async def test_forward_agent_not_found(pool):
     repo = FakeAgentRepo(None)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
     request = _make_request()
     route_req = RouteRequest()
@@ -105,7 +105,7 @@ async def test_forward_endpoint_not_found(pool):
     agent = _make_agent()
     agent.endpoints = []
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
     request = _make_request()
     route_req = RouteRequest()
@@ -118,7 +118,7 @@ async def test_forward_endpoint_not_found(pool):
 async def test_forward_block_success(pool):
     agent = _make_agent("block")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
 
     mock_response = MagicMock(spec=httpx.Response)
@@ -147,7 +147,7 @@ async def test_forward_block_success(pool):
 async def test_forward_stream_success(pool):
     agent = _make_agent("stream")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
 
     async def _aiter_bytes():
@@ -176,7 +176,7 @@ async def test_forward_stream_success(pool):
 async def test_forward_stream_cancelled(pool):
     agent = _make_agent("stream")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
 
     cancel_event = asyncio.Event()
@@ -208,7 +208,7 @@ async def test_forward_stream_cancelled(pool):
 async def test_forward_block_retry_on_5xx(pool):
     agent = _make_agent("block")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
 
     bad_response = MagicMock(spec=httpx.Response)
@@ -244,7 +244,7 @@ async def test_forward_block_retry_on_5xx(pool):
 async def test_forward_block_no_retry_on_4xx(pool):
     agent = _make_agent("block")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
 
     bad_response = MagicMock(spec=httpx.Response)
@@ -277,7 +277,7 @@ async def test_forward_param_mapping_builds_url_and_body(pool):
     agent = _make_agent("block", param_mapping=param_mapping)
     agent.endpoints[0].method = "POST"
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
 
     mock_response = MagicMock(spec=httpx.Response)
@@ -311,7 +311,7 @@ async def test_forward_get_ignores_body(pool):
     agent = _make_agent("block", param_mapping=param_mapping)
     agent.endpoints[0].method = "GET"
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "chat"))
+    engine = FakeRoutingEngine("agent-1")
     fwd = Forwarder(repo, engine, pool)
 
     mock_response = MagicMock(spec=httpx.Response)
