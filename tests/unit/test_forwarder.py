@@ -14,7 +14,6 @@ from agent_routers.models.agent import Agent, AgentEndpoint, AgentInstance
 from agent_routers.schemas.route import RouteRequest
 from agent_routers.services.forwarder import Forwarder
 from agent_routers.services.routing import RoutingDecisionEngine
-from agent_routers.services.session_manager import SessionManager
 
 
 class FakeAgentRepo:
@@ -47,7 +46,7 @@ def _make_agent(endpoint_mode: str = "block", param_mapping=None, session_config
     agent.endpoints = [
         AgentEndpoint(
             agent_id="agent-1",
-            endpoint_id="ep-1",
+            endpoint_id="chat",
             method="POST",
             path="/chat",
             path_params=[],
@@ -57,7 +56,6 @@ def _make_agent(endpoint_mode: str = "block", param_mapping=None, session_config
             idempotent=False,
             param_mapping=param_mapping,
             session_config=session_config,
-            operation_types=["chat"],
         ),
     ]
     return agent
@@ -86,14 +84,14 @@ def pool():
 def forwarder(pool):
     agent = _make_agent("block")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     return Forwarder(repo, engine, pool)
 
 
 @pytest.mark.asyncio
 async def test_forward_agent_not_found(pool):
     repo = FakeAgentRepo(None)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
     request = _make_request()
     route_req = RouteRequest()
@@ -107,7 +105,7 @@ async def test_forward_endpoint_not_found(pool):
     agent = _make_agent()
     agent.endpoints = []
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
     request = _make_request()
     route_req = RouteRequest()
@@ -120,7 +118,7 @@ async def test_forward_endpoint_not_found(pool):
 async def test_forward_block_success(pool):
     agent = _make_agent("block")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
 
     mock_response = MagicMock(spec=httpx.Response)
@@ -137,7 +135,7 @@ async def test_forward_block_success(pool):
     pool._clients["agent-1"] = mock_client
 
     request = _make_request(body=b'{"msg":"hi"}')
-    route_req = RouteRequest()
+    route_req = RouteRequest(context={"session_id": "sess-123"})
     response = await fwd.forward(request, route_req, None)
 
     assert isinstance(response, Response)
@@ -149,7 +147,7 @@ async def test_forward_block_success(pool):
 async def test_forward_stream_success(pool):
     agent = _make_agent("stream")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
 
     async def _aiter_bytes():
@@ -168,7 +166,7 @@ async def test_forward_stream_success(pool):
     pool._clients["agent-1"] = mock_client
 
     request = _make_request()
-    route_req = RouteRequest()
+    route_req = RouteRequest(context={"session_id": "sess-123"})
     response = await fwd.forward(request, route_req, None)
 
     assert isinstance(response, StreamingResponse)
@@ -178,7 +176,7 @@ async def test_forward_stream_success(pool):
 async def test_forward_stream_cancelled(pool):
     agent = _make_agent("stream")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
 
     cancel_event = asyncio.Event()
@@ -200,7 +198,7 @@ async def test_forward_stream_cancelled(pool):
     pool._clients["agent-1"] = mock_client
 
     request = _make_request()
-    route_req = RouteRequest()
+    route_req = RouteRequest(context={"session_id": "sess-123"})
     response = await fwd.forward(request, route_req, cancel_event)
 
     assert isinstance(response, StreamingResponse)
@@ -210,7 +208,7 @@ async def test_forward_stream_cancelled(pool):
 async def test_forward_block_retry_on_5xx(pool):
     agent = _make_agent("block")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
 
     bad_response = MagicMock(spec=httpx.Response)
@@ -235,7 +233,7 @@ async def test_forward_block_retry_on_5xx(pool):
     pool._clients["agent-1"] = mock_client
 
     request = _make_request()
-    route_req = RouteRequest()
+    route_req = RouteRequest(context={"session_id": "sess-123"})
     response = await fwd.forward(request, route_req, None)
 
     assert response.status_code == 200
@@ -246,7 +244,7 @@ async def test_forward_block_retry_on_5xx(pool):
 async def test_forward_block_no_retry_on_4xx(pool):
     agent = _make_agent("block")
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
 
     bad_response = MagicMock(spec=httpx.Response)
@@ -262,7 +260,7 @@ async def test_forward_block_no_retry_on_4xx(pool):
     pool._clients["agent-1"] = mock_client
 
     request = _make_request()
-    route_req = RouteRequest()
+    route_req = RouteRequest(context={"session_id": "sess-123"})
     with pytest.raises(httpx.HTTPStatusError):
         await fwd.forward(request, route_req, None)
 
@@ -279,7 +277,7 @@ async def test_forward_param_mapping_builds_url_and_body(pool):
     agent = _make_agent("block", param_mapping=param_mapping)
     agent.endpoints[0].method = "POST"
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
 
     mock_response = MagicMock(spec=httpx.Response)
@@ -294,7 +292,7 @@ async def test_forward_param_mapping_builds_url_and_body(pool):
     pool.create("agent-1", "http://localhost:8001")
     pool._clients["agent-1"] = mock_client
 
-    route_req = RouteRequest(input="NYC", context={"days": "7"}, options={})
+    route_req = RouteRequest(input="NYC", context={"days": "7", "session_id": "sess-123"}, options={})
     request = _make_request()
     response = await fwd.forward(request, route_req, None)
 
@@ -313,7 +311,7 @@ async def test_forward_get_ignores_body(pool):
     agent = _make_agent("block", param_mapping=param_mapping)
     agent.endpoints[0].method = "GET"
     repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
+    engine = FakeRoutingEngine(("agent-1", "chat"))
     fwd = Forwarder(repo, engine, pool)
 
     mock_response = MagicMock(spec=httpx.Response)
@@ -328,38 +326,9 @@ async def test_forward_get_ignores_body(pool):
     pool.create("agent-1", "http://localhost:8001")
     pool._clients["agent-1"] = mock_client
 
-    route_req = RouteRequest(input="NYC", context={}, options={})
+    route_req = RouteRequest(input="NYC", context={"session_id": "sess-123"}, options={})
     request = _make_request()
     response = await fwd.forward(request, route_req, None)
 
     call_args = mock_client.request.call_args
     assert call_args.kwargs["content"] == b""
-
-
-@pytest.mark.asyncio
-async def test_forward_session_extraction_from_header(pool):
-    session_config = {"response_header": "X-Session-ID"}
-    agent = _make_agent("block", session_config=session_config)
-    repo = FakeAgentRepo(agent)
-    engine = FakeRoutingEngine(("agent-1", "ep-1"))
-
-    mock_session_mgr = AsyncMock(spec=SessionManager)
-    fwd = Forwarder(repo, engine, pool, session_manager=mock_session_mgr)
-
-    mock_response = MagicMock(spec=httpx.Response)
-    mock_response.content = b'{}'
-    mock_response.status_code = 200
-    mock_response.headers = {"X-Session-ID": "sess-abc"}
-    mock_response.raise_for_status = MagicMock()
-
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
-    mock_client.request = AsyncMock(return_value=mock_response)
-
-    pool.create("agent-1", "http://localhost:8001")
-    pool._clients["agent-1"] = mock_client
-
-    route_req = RouteRequest(context={}, options={})
-    request = _make_request()
-    response = await fwd.forward(request, route_req, None)
-
-    mock_session_mgr.set_route.assert_awaited_once_with("agent-1", "sess-abc", "ep-1")

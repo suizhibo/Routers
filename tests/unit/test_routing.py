@@ -37,9 +37,7 @@ class FakeSessionManager:
         return self._route
 
 
-def _make_agent(agent_id: str, endpoint_id: str, operation_types: list[str] | None = None) -> Agent:
-    if operation_types is None:
-        operation_types = []
+def _make_agent(agent_id: str, endpoint_id: str) -> Agent:
     agent = Agent(agent_id=agent_id, name=f"Agent {agent_id}", subject=f"sub-{agent_id}")
     agent.endpoints = [
         AgentEndpoint(
@@ -54,7 +52,6 @@ def _make_agent(agent_id: str, endpoint_id: str, operation_types: list[str] | No
             idempotent=False,
             param_mapping={},
             session_config=None,
-            operation_types=operation_types,
         ),
     ]
     return agent
@@ -84,16 +81,16 @@ def _make_engine(
 async def test_l1_preferred_header_wins():
     engine = _make_engine()
     req = RouteRequest()
-    headers = {"X-Preferred-Agent": "agent-a", "X-Preferred-Endpoint": "ep-1"}
+    headers = {"X-Preferred-Agent": "agent-a"}
     result = await engine.resolve(req, headers)
-    assert result == ("agent-a", "ep-1")
+    assert result == ("agent-a", "chat")
 
 
 @pytest.mark.asyncio
-async def test_l1_preferred_partial_ignored():
+async def test_l1_preferred_without_agent_ignored():
     engine = _make_engine()
     req = RouteRequest()
-    headers = {"X-Preferred-Agent": "agent-a"}  # missing endpoint
+    headers = {}  # missing preferred agent
     with pytest.raises(AgentNotFoundError):
         await engine.resolve(req, headers)
 
@@ -105,18 +102,18 @@ async def test_l2_cache_hit():
     engine = _make_engine(session_route=("agent-a", "ep-1"))
     req = RouteRequest(context={"session_id": "sess-123"})
     result = await engine.resolve(req, {})
-    assert result == ("agent-a", "ep-1")
+    assert result == ("agent-a", "chat")
 
 
 @pytest.mark.asyncio
 async def test_l2_cache_miss_falls_through():
     engine = _make_engine(
-        agents=[_make_agent("agent-a", "ep-1", ["chat"])],
+        agents=[_make_agent("agent-a", "ep-1")],
         session_route=None,
     )
-    req = RouteRequest(context={"session_id": "sess-123", "operation": "chat"})
-    result = await engine.resolve(req, {})
-    assert result == ("agent-a", "ep-1")
+    req = RouteRequest(context={"session_id": "sess-123"})
+    with pytest.raises(AgentNotFoundError):
+        await engine.resolve(req, {})
 
 
 # --- L3 Rule ---
@@ -156,27 +153,7 @@ async def test_l3_rule_no_endpoint_uses_first():
     assert result == ("agent-a", "ep-first")
 
 
-# --- L4 Operation Match ---
 
-@pytest.mark.asyncio
-async def test_l4_operation_match():
-    engine = _make_engine(agents=[
-        _make_agent("agent-a", "ep-chat", ["chat"]),
-        _make_agent("agent-b", "ep-search", ["search"]),
-    ])
-    req = RouteRequest(context={"operation": "chat"})
-    result = await engine.resolve(req, {})
-    assert result == ("agent-a", "ep-chat")
-
-
-@pytest.mark.asyncio
-async def test_l4_operation_from_options():
-    engine = _make_engine(agents=[
-        _make_agent("agent-a", "ep-chat", ["chat"]),
-    ])
-    req = RouteRequest(options={"action": "chat"})
-    result = await engine.resolve(req, {})
-    assert result == ("agent-a", "ep-chat")
 
 
 # --- L5 Default ---
@@ -184,7 +161,7 @@ async def test_l4_operation_from_options():
 @pytest.mark.asyncio
 async def test_l5_default():
     engine = _make_engine(
-        agents=[_make_agent("agent-default", "ep-1", ["chat"])],
+        agents=[_make_agent("agent-default", "ep-1")],
         default_agent_id="agent-default",
     )
     req = RouteRequest()
@@ -206,9 +183,9 @@ async def test_l5_no_default_raises():
 async def test_l1_overrides_l2():
     engine = _make_engine(session_route=("agent-cache", "ep-cache"))
     req = RouteRequest(context={"session_id": "sess-123"})
-    headers = {"X-Preferred-Agent": "agent-pref", "X-Preferred-Endpoint": "ep-pref"}
+    headers = {"X-Preferred-Agent": "agent-pref"}
     result = await engine.resolve(req, headers)
-    assert result == ("agent-pref", "ep-pref")
+    assert result == ("agent-pref", "chat")
 
 
 @pytest.mark.asyncio
@@ -229,7 +206,7 @@ async def test_l2_overrides_l3():
     )
     req = RouteRequest(context={"session_id": "sess-123"})
     result = await engine.resolve(req, {})
-    assert result == ("agent-cache", "ep-cache")
+    assert result == ("agent-cache", "chat")
 
 
 # --- when_clause evaluator ---

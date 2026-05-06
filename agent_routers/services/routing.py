@@ -65,18 +65,18 @@ class RoutingDecisionEngine:
 
         # L1: Preferred
         preferred_agent = headers.get("X-Preferred-Agent")
-        preferred_endpoint = headers.get("X-Preferred-Endpoint")
-        if preferred_agent and preferred_endpoint:
-            logger.debug("routing_l1_preferred", extra={"agent": preferred_agent, "endpoint": preferred_endpoint})
-            return preferred_agent, preferred_endpoint
+        if preferred_agent:
+            logger.debug("routing_l1_preferred", extra={"agent": preferred_agent, "endpoint": "chat"})
+            return preferred_agent, "chat"
 
         # L2: Cache
         session_id = _extract_value(req_dict, "context.session_id")
         if session_id and self._session_manager:
             cached = await self._session_manager.get_route(session_id)
             if cached:
-                logger.debug("routing_l2_cache", extra={"session_id": session_id, "route": cached})
-                return cached
+                agent_id, _ = cached
+                logger.debug("routing_l2_cache", extra={"session_id": session_id, "route": (agent_id, "chat")})
+                return agent_id, "chat"
 
         # L3: Rule
         rules = await self._rule_repo.list_enabled()
@@ -92,25 +92,14 @@ class RoutingDecisionEngine:
                     logger.debug("routing_l3_rule", extra={"rule_id": rule.rule_id, "route": (agent_id, endpoint_id)})
                     return agent_id, endpoint_id
 
-        # L4: Operation Match
-        operation = _extract_value(req_dict, "context.operation")
-        if not operation:
-            operation = _extract_value(req_dict, "options.action")
-        if operation:
-            agents = await self._agent_repo.list_all()
-            for agent in agents:
-                for ep in agent.endpoints:
-                    op_types = ep.operation_types or []
-                    if operation in op_types:
-                        logger.debug("routing_l4_operation", extra={"operation": operation, "route": (agent.agent_id, ep.endpoint_id)})
-                        return agent.agent_id, ep.endpoint_id
-
-        # L5: Default
+        # L4: Default
+        # (Operation Match removed) L4 no longer exists; routing proceeds with L1-L3 and L4-default
+        # Note: The default route uses the configured default_agent_id if available.
         if self._default_agent_id:
             agent = await self._agent_repo.get_by_id(self._default_agent_id)
             if agent and agent.endpoints:
                 ep_id = agent.endpoints[0].endpoint_id
-                logger.debug("routing_l5_default", extra={"route": (self._default_agent_id, ep_id)})
+                logger.debug("routing_l4_default", extra={"route": (self._default_agent_id, ep_id)})
                 return self._default_agent_id, ep_id
 
         from agent_routers.errors import AgentNotFoundError

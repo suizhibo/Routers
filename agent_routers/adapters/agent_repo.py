@@ -45,7 +45,6 @@ class AgentRepository:
                         idempotent=ep.idempotent,
                         param_mapping=ep.param_mapping.model_dump(),
                         session_config=ep.session_config.model_dump() if ep.session_config else None,
-                        operation_types=list(ep.operation_types),
                     )
                 )
 

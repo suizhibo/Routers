@@ -8,18 +8,18 @@ from urllib.parse import urlencode
 
 import httpx
 import tenacity
+from purgatory.service._async.circuitbreaker import AsyncCircuitBreakerFactory
+from purgatory.service._async.unit_of_work import AsyncInMemoryUnitOfWork
 from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 
-from agent_routers.adapters.http_client import get_client_pool, PerAgentClientPool
 from agent_routers.adapters.agent_repo import AgentRepository
+from agent_routers.adapters.http_client import PerAgentClientPool
+from agent_routers.errors import AgentNotFoundError, AgentUnavailableError, EndpointNotFoundError
+from agent_routers.models.agent import Agent, AgentEndpoint
 from agent_routers.schemas.route import RouteRequest
 from agent_routers.services.routing import RoutingDecisionEngine
 from agent_routers.services.session_manager import SessionManager
-from agent_routers.errors import AgentNotFoundError, AgentUnavailableError, EndpointNotFoundError
-
-from purgatory.service._async.circuitbreaker import AsyncCircuitBreakerFactory
-from purgatory.service._async.unit_of_work import AsyncInMemoryUnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +60,8 @@ class _CircuitBreakerWrapper:
 _cb = _CircuitBreakerWrapper(error_threshold=5, recovery_timeout=60.0)
 
 
-def _circuit_key(agent_id: str, instance_id: str) -> str:
-    return f"{agent_id}:{instance_id}"
+def _circuit_key(agent_id: str, session_id: str) -> str:
+    return f"{agent_id}:{session_id}"
 
 
 def _retry_if_not_cancelled(retry_state: tenacity.RetryCallState) -> bool:
@@ -69,7 +69,7 @@ def _retry_if_not_cancelled(retry_state: tenacity.RetryCallState) -> bool:
         return True
     exc = retry_state.outcome.exception()
     if exc is not None and isinstance(exc, asyncio.CancelledError):
-        raise tenacity.StopAfterAttempt(retry_state.attempt_number)
+        raise tenacity.RetryError(retry_state)  # type: ignore[arg-type]
     return True
 
 
@@ -79,7 +79,7 @@ def _is_retryable_http_error(exc: BaseException) -> bool:
     return 500 <= exc.response.status_code <= 599
 
 
-def _extract_value(data: dict, dot_path: str) -> Any:
+def _extract_value(data: dict[str, Any], dot_path: str) -> Any:
     if dot_path == "$":
         return data
     current = data
@@ -91,7 +91,9 @@ def _extract_value(data: dict, dot_path: str) -> Any:
     return current
 
 
-def _build_url(path_template: str, path_params: dict, query_params: dict) -> str:
+def _build_url(
+    path_template: str, path_params: dict[str, Any], query_params: dict[str, Any]
+) -> str:
     url = path_template.format(**path_params)
     if query_params:
         url = f"{url}?{urlencode(query_params)}"
@@ -119,65 +121,146 @@ class Forwarder:
         self._pool = client_pool
         self._session_manager = session_manager
 
+    @staticmethod
+    def _find_endpoint(agent: Agent, endpoint_id: str) -> AgentEndpoint:
+        for ep in agent.endpoints:
+            if ep.endpoint_id == endpoint_id:
+                return ep
+        raise EndpointNotFoundError(
+            f"Endpoint '{endpoint_id}' not found on agent '{agent.agent_id}'"
+        )
+
+    def _build_request(
+        self,
+        route_req: RouteRequest,
+        endpoint: AgentEndpoint,
+    ) -> tuple[str, bytes]:
+        """Build full URL and body from route request and endpoint mapping."""
+        req_dict = route_req.model_dump()
+        mapping = endpoint.param_mapping or {}
+
+        path_params = {}
+        for key, dot_path in mapping.get("path_params", {}).items():
+            val = _extract_value(req_dict, dot_path)
+            if val is not None:
+                path_params[key] = str(val)
+
+        query_params = {}
+        for key, dot_path in mapping.get("query_params", {}).items():
+            val = _extract_value(req_dict, dot_path)
+            if val is not None:
+                query_params[key] = str(val)
+
+        url_path = _build_url(endpoint.path, path_params, query_params)
+
+        body_bytes = b""
+        if endpoint.method not in IDEMPOTENT_METHODS and mapping.get("body"):
+            body_value = _extract_value(req_dict, mapping["body"])
+            body_bytes = _serialize_body(body_value)
+
+        return url_path, body_bytes
+
+    @staticmethod
+    def _extract_session_id(upstream: httpx.Response, endpoint: AgentEndpoint) -> str | None:
+        """Extract session_id from upstream response using endpoint session config."""
+        session_config = endpoint.session_config
+        if not session_config:
+            return None
+
+        response_header = session_config.get("response_header")
+        if response_header:
+            session_id = upstream.headers.get(response_header)
+            if isinstance(session_id, str):
+                return session_id
+
+        response_body_path = session_config.get("response_body_path")
+        if response_body_path:
+            content_type = upstream.headers.get("content-type", "")
+            if "application/json" in content_type:
+                try:
+                    body_json = upstream.json()
+                    result = _extract_value(body_json, response_body_path)
+                    if isinstance(result, str):
+                        return result
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+        return None
+
+    async def _auto_create_session(
+        self,
+        request: Request,
+        route_req: RouteRequest,
+        agent_id: str,
+    ) -> str:
+        create_req = RouteRequest(
+            input=route_req.input,
+            context={k: v for k, v in route_req.context.items() if k != "session_id"},
+            options=route_req.options,
+        )
+
+        agent = await self._agent_repo.get_by_id(agent_id)
+        if not agent:
+            raise AgentNotFoundError(f"Agent '{agent_id}' not found")
+
+        endpoint = self._find_endpoint(agent, "create-session")
+
+        url_path, body_bytes = self._build_request(create_req, endpoint)
+        base_url = agent.instances[0].base_url
+        full_url = f"{base_url.rstrip('/')}/{url_path.lstrip('/')}"
+
+        client = self._pool.get(agent_id)
+        if client is None:
+            client = self._pool.create(agent_id, base_url)
+
+        upstream = await client.request(
+            endpoint.method, full_url,
+            headers=dict(request.headers), content=body_bytes
+        )
+        upstream.raise_for_status()
+
+        session_id = self._extract_session_id(upstream, endpoint)
+        if not session_id:
+            raise AgentUnavailableError("Failed to extract session_id from create-session response")
+
+        if self._session_manager:
+            await self._session_manager.set_route(agent_id, session_id, endpoint.endpoint_id)
+
+        return session_id
+
     async def forward(
         self,
         request: Request,
         route_req: RouteRequest,
         cancel_event: asyncio.Event | None,
     ) -> Response:
-        # 1. 5-level pipeline resolves agent + endpoint
-        agent_id, endpoint_id = await self._routing_engine.resolve(
+        session_id = route_req.context.get("session_id")
+
+        # Resolve agent once; session communication always uses "chat" endpoint
+        agent_id, _ = await self._routing_engine.resolve(
             route_req, dict(request.headers)
         )
 
-        # 2. Fetch agent and endpoint
+        if not session_id:
+            session_id = await self._auto_create_session(request, route_req, agent_id)
+            route_req.context["session_id"] = session_id
+
+        # Fetch agent and its chat endpoint
         agent = await self._agent_repo.get_by_id(agent_id)
         if agent is None:
             raise AgentNotFoundError(f"Agent '{agent_id}' not registered")
 
-        endpoint = None
-        for ep in agent.endpoints:
-            if ep.endpoint_id == endpoint_id:
-                endpoint = ep
-                break
-        if endpoint is None:
-            raise EndpointNotFoundError(f"Endpoint '{endpoint_id}' not found on agent '{agent_id}'")
+        endpoint = self._find_endpoint(agent, "chat")
 
-        # 3. Use first instance's base_url directly (no instance selection)
-        if not agent.instances:
-            raise AgentUnavailableError(f"Agent '{agent_id}' has no instances")
+        # Build request
+        url_path, body_bytes = self._build_request(route_req, endpoint)
         base_url = agent.instances[0].base_url
-
-        # 4. Build URL from param_mapping
-        req_dict = route_req.model_dump()
-        mapping = endpoint.param_mapping
-        path_params = {}
-        if mapping:
-            for key, dot_path in mapping.get("path_params", {}).items():
-                val = _extract_value(req_dict, dot_path)
-                if val is not None:
-                    path_params[key] = str(val)
-
-        query_params = {}
-        if mapping:
-            for key, dot_path in mapping.get("query_params", {}).items():
-                val = _extract_value(req_dict, dot_path)
-                if val is not None:
-                    query_params[key] = str(val)
-
-        url_path = _build_url(endpoint.path, path_params, query_params)
         full_url = f"{base_url.rstrip('/')}/{url_path.lstrip('/')}"
 
-        # 5. Build body
-        body_bytes = b""
-        if endpoint.method not in IDEMPOTENT_METHODS and mapping and mapping.get("body"):
-            body_value = _extract_value(req_dict, mapping["body"])
-            body_bytes = _serialize_body(body_value)
-
-        # 6. Circuit breaker
-        key = _circuit_key(agent_id, agent.instances[0].instance_id)
-        if await _cb.is_open(key):
-            raise AgentUnavailableError(f"Circuit open for {key}")
+        # 4. Circuit breaker
+        circuit_key = _circuit_key(agent_id, session_id)
+        if await _cb.is_open(circuit_key):
+            raise AgentUnavailableError(f"Circuit open for {circuit_key}")
 
         client = self._pool.get(agent_id)
         if client is None:
@@ -185,13 +268,13 @@ class Forwarder:
 
         if endpoint.mode == "block":
             return await self._forward_block(
-                client, endpoint.method, full_url, dict(request.headers), body_bytes, key,
-                endpoint, agent_id, agent.instances[0].instance_id,
+                client, endpoint.method, full_url, dict(request.headers), body_bytes,
+                circuit_key,
             )
         else:
             return await self._forward_stream(
-                client, endpoint.method, full_url, dict(request.headers), body_bytes, cancel_event, key,
-                endpoint, agent_id, agent.instances[0].instance_id,
+                client, endpoint.method, full_url, dict(request.headers), body_bytes,
+                cancel_event, agent_id, session_id,
             )
 
     @tenacity.retry(
@@ -205,12 +288,9 @@ class Forwarder:
         client: httpx.AsyncClient,
         method: str,
         url: str,
-        headers: dict,
+        headers: dict[str, Any],
         body: bytes,
         circuit_key: str,
-        endpoint,
-        agent_id: str,
-        target_instance_id: str,
     ) -> Response:
         try:
             upstream = await client.request(method, url, headers=headers, content=body)
@@ -224,23 +304,6 @@ class Forwarder:
             else:
                 await _cb.record_success(circuit_key)
 
-        # Extract session_id from response
-        session_config = endpoint.session_config
-        if session_config and self._session_manager:
-            session_id = None
-            if session_config.get("response_header"):
-                session_id = upstream.headers.get(session_config["response_header"])
-            if not session_id and session_config.get("response_body_path"):
-                content_type = upstream.headers.get("content-type", "")
-                if "application/json" in content_type:
-                    try:
-                        body_json = upstream.json()
-                        session_id = _extract_value(body_json, session_config["response_body_path"])
-                    except Exception:
-                        pass
-            if session_id:
-                await self._session_manager.set_route(agent_id, session_id, endpoint.endpoint_id)
-
         upstream.raise_for_status()
         return Response(
             content=upstream.content,
@@ -253,24 +316,15 @@ class Forwarder:
         client: httpx.AsyncClient,
         method: str,
         url: str,
-        headers: dict,
+        headers: dict[str, Any],
         body: bytes,
         cancel_event: asyncio.Event | None,
-        circuit_key: str,
-        endpoint,
         agent_id: str,
-        target_instance_id: str,
+        session_id: str | None,
     ) -> StreamingResponse:
         async def generator() -> AsyncIterator[bytes]:
             try:
                 async with client.stream(method, url, headers=headers, content=body) as upstream:
-                    # Extract session_id from stream response header
-                    session_config = endpoint.session_config
-                    if session_config and session_config.get("response_header") and self._session_manager:
-                        session_id = upstream.headers.get(session_config["response_header"])
-                        if session_id:
-                            await self._session_manager.set_route(agent_id, session_id, endpoint.endpoint_id)
-
                     async for chunk in upstream.aiter_bytes():
                         if cancel_event is not None and cancel_event.is_set():
                             logger.info("stream_cancelled")
@@ -283,4 +337,8 @@ class Forwarder:
         return StreamingResponse(
             generator(),
             media_type="text/event-stream",
+            headers={
+                "X-Preferred-Agent": agent_id,
+                "X-Session-Id": session_id or "",
+            },
         )
