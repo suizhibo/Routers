@@ -106,13 +106,12 @@ app.add_middleware(RequestIdMiddleware)    # outermost
 
 Starlette dispatches outermost first, so `RequestIdMiddleware` runs before `JWTAuthMiddleware`.
 
-### Routing Pipeline (5 levels)
-`RoutingDecisionEngine.resolve()` priority:
-1. **L1**: `X-Preferred-Agent` header (endpoint defaults to `"chat"`)
-2. **L2**: Session cache (Redis `session:{session_id}` → `agent_id:endpoint_id`)
+### Routing Pipeline
+`RoutingDecisionEngine.resolve()` returns `agent_id` (string), priority:
+1. **L1**: `X-Preferred-Agent` header selects agent directly
+2. **L2**: Session cache (Redis `session:{session_id}` → `agent_id`)
 3. **L3**: Matching routing rule (`when_clause` on headers/context/options)
-4. **L4**: Operation type match (`context.operation` or `options.action` → `endpoint.operation_types`)
-5. **L5**: Default agent (`DEFAULT_AGENT_ID` setting)
+4. **L4**: Default agent (`DEFAULT_AGENT_ID` setting)
 
 ### Auth & Roles
 - JWT `sub` claim = agent subject (must match on register/deregister)
@@ -124,7 +123,7 @@ Starlette dispatches outermost first, so `RequestIdMiddleware` runs before `JWTA
 - **stream**: SSE streaming; checks `cancel_event.is_set()` between chunks
 
 ### Circuit Breaker
-- Per `(agent_id, instance_id)` key using `purgatory` library
+- Per `agent_id:session_id` key using `purgatory` library
 - Threshold: 5 failures; recovery: 60s
 
 ### Session Extraction
@@ -134,7 +133,7 @@ agent's `create-session` endpoint and extracts the new id from:
 1. Response header (configured in `endpoint.session_config.response_header`), or
 2. JSON body path (configured in `endpoint.session_config.response_body_path`).
 
-Then stores in Redis: `session:{session_id} = {agent_id}:{endpoint_id}` (TTL 24h).
+Then stores in Redis: `session:{session_id} = {agent_id}` (TTL 24h).
 chat/stop responses do **not** contribute to the session cache — `session_id`
 flows in via `context.session_id` and is forwarded to the upstream through
 `param_mapping`.
@@ -214,7 +213,7 @@ Generates JWTs using `/tmp/mock_jwks_private.pem` (created by `scripts/mock_jwks
 ## Common Pitfalls
 
 1. **Middleware ordering**: Adding middleware in wrong order breaks auth/quota/audit chain.
-2. **Forwarder signature changes**: `_forward_block()` takes `circuit_key` only; `_forward_stream()` takes `cancel_event` only. Contract tests need corresponding updates.
+2. **Forwarder hardcodes endpoints**: `forward()` always uses the agent's `chat` endpoint; `_auto_create_session()` uses `create_session`. No endpoint selection at runtime.
 3. **Redis connection lazy init**: `SessionManager`, `CancellationBroadcaster`, `RedisQuota` all lazily create Redis clients on first use. Ensure Redis is up before first request.
 4. **JWT subject matching**: Agent registration `subject` must match JWT `sub` claim. Admin endpoints check `role == "admin"`.
 5. **Circuit breaker state**: `purgatory` circuit breaker is in-memory; not shared across processes.
