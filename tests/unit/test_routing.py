@@ -30,10 +30,10 @@ class FakeRuleRepo:
 
 
 class FakeSessionManager:
-    def __init__(self, route: tuple[str, str] | None = None):
+    def __init__(self, route: str | None = None):
         self._route = route
 
-    async def get_route(self, session_id: str) -> tuple[str, str] | None:
+    async def get_route(self, session_id: str) -> str | None:
         return self._route
 
 
@@ -60,7 +60,7 @@ def _make_agent(agent_id: str, endpoint_type: str) -> Agent:
 def _make_engine(
     agents: list[Agent] = None,
     rules: list[RoutingRule] = None,
-    session_route: tuple[str, str] | None = None,
+    session_route: str | None = None,
     default_agent_id: str = "",
 ):
     if agents is None:
@@ -83,7 +83,7 @@ async def test_l1_preferred_header_wins():
     req = RouteRequest()
     headers = {"X-Preferred-Agent": "agent-a"}
     result = await engine.resolve(req, headers)
-    assert result == ("agent-a", "chat")
+    assert result == "agent-a"
 
 
 @pytest.mark.asyncio
@@ -99,10 +99,10 @@ async def test_l1_preferred_without_agent_ignored():
 
 @pytest.mark.asyncio
 async def test_l2_cache_hit():
-    engine = _make_engine(session_route=("agent-a", "ep-1"))
+    engine = _make_engine(session_route="agent-a")
     req = RouteRequest(context={"session_id": "sess-123"})
     result = await engine.resolve(req, {})
-    assert result == ("agent-a", "chat")
+    assert result == "agent-a"
 
 
 @pytest.mark.asyncio
@@ -126,14 +126,14 @@ async def test_l3_rule_match():
         when_clause={"header.region": "us-east"},
         target_agent_id="agent-a",
         target_instance_id="inst-1",
-        target_endpoint_id="ep-1",
+        target_endpoint_type="chat",
         enabled=True,
     )
     engine = _make_engine(agents=[_make_agent("agent-a", "ep-1")], rules=[rule])
     req = RouteRequest()
     headers = {"region": "us-east"}
     result = await engine.resolve(req, headers)
-    assert result == ("agent-a", "ep-1")
+    assert result == "agent-a"
 
 
 @pytest.mark.asyncio
@@ -144,13 +144,13 @@ async def test_l3_rule_no_endpoint_uses_first():
         when_clause={},
         target_agent_id="agent-a",
         target_instance_id="inst-1",
-        target_endpoint_id=None,
+        target_endpoint_type=None,
         enabled=True,
     )
     engine = _make_engine(agents=[_make_agent("agent-a", "ep-first")], rules=[rule])
     req = RouteRequest()
     result = await engine.resolve(req, {})
-    assert result == ("agent-a", "ep-first")
+    assert result == "agent-a"
 
 
 
@@ -166,7 +166,7 @@ async def test_l5_default():
     )
     req = RouteRequest()
     result = await engine.resolve(req, {})
-    assert result == ("agent-default", "ep-1")
+    assert result == "agent-default"
 
 
 @pytest.mark.asyncio
@@ -185,7 +185,7 @@ async def test_l1_overrides_l2():
     req = RouteRequest(context={"session_id": "sess-123"})
     headers = {"X-Preferred-Agent": "agent-pref"}
     result = await engine.resolve(req, headers)
-    assert result == ("agent-pref", "chat")
+    assert result == "agent-pref"
 
 
 @pytest.mark.asyncio
@@ -196,17 +196,17 @@ async def test_l2_overrides_l3():
         when_clause={},
         target_agent_id="agent-rule",
         target_instance_id="inst-1",
-        target_endpoint_id="ep-rule",
+        target_endpoint_type="chat",
         enabled=True,
     )
     engine = _make_engine(
         agents=[_make_agent("agent-rule", "ep-rule")],
         rules=[rule],
-        session_route=("agent-cache", "ep-cache"),
+        session_route="agent-cache",
     )
     req = RouteRequest(context={"session_id": "sess-123"})
     result = await engine.resolve(req, {})
-    assert result == ("agent-cache", "chat")
+    assert result == "agent-cache"
 
 
 # --- when_clause evaluator ---
