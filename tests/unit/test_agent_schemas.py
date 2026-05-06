@@ -12,7 +12,7 @@ def test_agent_registration_valid():
         ],
         endpoints=[
             EndpointSpec(
-                endpoint_id="get_forecast",
+                endpoint_type="chat",
                 method="POST",
                 path="/api/v1/forecast",
                 mode="block",
@@ -36,7 +36,7 @@ def test_agent_registration_rejects_empty_instances():
             instances=[],
             endpoints=[
                 EndpointSpec(
-                    endpoint_id="e1",
+                    endpoint_type="chat",
                     method="GET",
                     path="/",
                     mode="block",
@@ -47,7 +47,7 @@ def test_agent_registration_rejects_empty_instances():
 
 def test_endpoint_spec_with_session_config():
     ep = EndpointSpec(
-        endpoint_id="chat",
+        endpoint_type="chat",
         method="POST",
         path="/api/chat/{session_id}",
         mode="stream",
