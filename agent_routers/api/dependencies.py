@@ -19,7 +19,7 @@ class AuthContext(BaseModel):
 
 
 def get_registry(request: Request) -> AgentRegistry:
-    return request.state.registry
+    return request.app.state.registry
 
 
 def get_auth(request: Request) -> AuthContext:

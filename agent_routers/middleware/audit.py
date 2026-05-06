@@ -40,7 +40,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         latency_ms = int((time.time() - start_ms) * 1000)
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.utcnow().isoformat()
 
         agent_id = request.path_params.get("agent_id", "")
         endpoint_id = request.path_params.get("endpoint_id", "")
