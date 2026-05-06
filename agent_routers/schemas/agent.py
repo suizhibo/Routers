@@ -51,7 +51,7 @@ class InstanceInfo(BaseModel):
 
 
 class EndpointSpec(BaseModel):
-    endpoint_id: str
+    endpoint_type: str
     method: HTTPMethod
     path: Annotated[str, Field(min_length=1, max_length=2048)]
     path_params: list[ParamSpec] = Field(default_factory=list)

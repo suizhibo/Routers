@@ -14,7 +14,6 @@ class AuditEvent(Base):
     timestamp: Mapped[datetime] = mapped_column(nullable=False)
     user_subject: Mapped[str] = mapped_column(String(255), nullable=False)
     agent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    endpoint_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     instance_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     method: Mapped[str | None] = mapped_column(String(16), nullable=True)
     status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
