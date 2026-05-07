@@ -21,6 +21,8 @@ class AgentRepository:
                 base_url=registration.base_url,
                 capability=registration.capability,
                 description=registration.description,
+                auth_header=registration.auth_header,
+                auth_token=registration.auth_token,
             )
             session.add(agent)
 
