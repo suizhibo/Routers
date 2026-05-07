@@ -67,6 +67,8 @@ class AgentRegistry:
             base_url=agent.base_url,
             capability=agent.capability,
             description=agent.description,
+            auth_header=agent.auth_header,
+            auth_token="***" if agent.auth_token else None,
             endpoints=endpoints,
             created_at=agent.created_at,
             updated_at=agent.updated_at,
