@@ -74,3 +74,29 @@ def test_agent_registration_optional_fields():
     )
     assert reg.capability is None
     assert reg.description is None
+    assert reg.auth_header is None
+    assert reg.auth_token is None
+
+
+def test_agent_registration_with_auth_fields():
+    reg = AgentRegistration(
+        agent_id="kb-agent",
+        name="KB Agent",
+        subject="svc-kb",
+        base_url="https://kb:8080",
+        auth_header="x-api-key",
+        auth_token="secret-123",
+        endpoints=[
+            EndpointSpec(
+                endpoint_type="chat",
+                method="POST",
+                path="/api/chat",
+                mode="block",
+                idempotent=False,
+                param_mapping=ParamMapping(path_params={}, query_params={}, body=None),
+                session_config=None,
+            ),
+        ],
+    )
+    assert reg.auth_header == "x-api-key"
+    assert reg.auth_token == "secret-123"
