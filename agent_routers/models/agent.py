@@ -43,6 +43,8 @@ class Agent(Base):
     )
 
     base_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    capability: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     endpoints: Mapped[list[AgentEndpoint]] = relationship(
         back_populates="agent", cascade="all, delete-orphan"
     )

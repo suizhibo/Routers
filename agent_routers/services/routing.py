@@ -5,6 +5,7 @@ from typing import Any
 
 from agent_routers.adapters.agent_repo import AgentRepository
 from agent_routers.adapters.rule_repo import RuleRepository
+from agent_routers.models.rule import RoutingRule
 from agent_routers.schemas.route import RouteRequest
 from agent_routers.services.session_manager import SessionManager
 
@@ -56,6 +57,16 @@ class RoutingDecisionEngine:
         self._session_manager = session_manager
         self._default_agent_id = default_agent_id
 
+    async def _resolve_rule_target(self, rule: RoutingRule) -> str | None:
+        if rule.target_agent_id:
+            return rule.target_agent_id
+        if rule.target_capability:
+            agents = await self._agent_repo.list_all()
+            for agent in agents:
+                if agent.capability == rule.target_capability:
+                    return agent.agent_id
+        return None
+
     async def resolve(
         self,
         route_req: RouteRequest,
@@ -81,12 +92,12 @@ class RoutingDecisionEngine:
         rules = await self._rule_repo.list_enabled()
         for rule in rules:
             if _evaluate_when_clause(rule.when_clause, route_req, headers):
-                logger.debug("routing_l3_rule", extra={"rule_id": rule.rule_id, "agent_id": rule.target_agent_id})
-                return rule.target_agent_id
+                target = await self._resolve_rule_target(rule)
+                if target:
+                    logger.debug("routing_l3_rule", extra={"rule_id": rule.rule_id, "agent_id": target})
+                    return target
 
         # L4: Default
-        # (Operation Match removed) L4 no longer exists; routing proceeds with L1-L3 and L4-default
-        # Note: The default route uses the configured default_agent_id if available.
         if self._default_agent_id:
             logger.debug("routing_l4_default", extra={"agent_id": self._default_agent_id})
             return self._default_agent_id

@@ -8,6 +8,8 @@ def test_agent_registration_valid():
         name="Weather Agent",
         subject="svc-weather",
         base_url="https://weather-svc:8080",
+        capability="weather",
+        description="Provides weather forecasts",
         endpoints=[
             EndpointSpec(
                 endpoint_type="chat",
@@ -22,6 +24,8 @@ def test_agent_registration_valid():
     )
     assert reg.agent_id == "weather-agent"
     assert reg.base_url == "https://weather-svc:8080"
+    assert reg.capability == "weather"
+    assert reg.description == "Provides weather forecasts"
     assert reg.endpoints[0].param_mapping.body is None
 
 
@@ -50,3 +54,23 @@ def test_endpoint_spec_with_session_config():
     )
     assert ep.session_config.response_header == "X-Session-ID"
     assert ep.param_mapping.path_params["session_id"] == "context.session_id"
+
+
+def test_agent_registration_optional_fields():
+    reg = AgentRegistration(
+        agent_id="minimal-agent",
+        name="Minimal Agent",
+        subject="svc-minimal",
+        base_url="http://localhost:8001",
+        endpoints=[
+            EndpointSpec(
+                endpoint_type="chat",
+                method="GET",
+                path="/",
+                mode="block",
+                idempotent=False,
+            ),
+        ],
+    )
+    assert reg.capability is None
+    assert reg.description is None

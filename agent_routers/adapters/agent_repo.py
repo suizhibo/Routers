@@ -19,6 +19,8 @@ class AgentRepository:
                 name=registration.name,
                 subject=registration.subject,
                 base_url=registration.base_url,
+                capability=registration.capability,
+                description=registration.description,
             )
             session.add(agent)
 
@@ -46,7 +48,9 @@ class AgentRepository:
     async def get_by_id(self, agent_id: str) -> Agent | None:
         async with self._sf() as session:
             result = await session.execute(
-                select(Agent).where(Agent.agent_id == agent_id)
+                select(Agent)
+                .where(Agent.agent_id == agent_id)
+                .options(selectinload(Agent.endpoints))
             )
             return result.scalar_one_or_none()
 

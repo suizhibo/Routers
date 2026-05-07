@@ -63,6 +63,8 @@ class AgentRegistration(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     subject: str = Field(min_length=1, max_length=255)
     base_url: Annotated[str, Field(min_length=1, max_length=2048)]
+    capability: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None)
     endpoints: Annotated[list[EndpointSpec], Field(min_length=1)]
 
 
@@ -79,6 +81,8 @@ class AgentDetail(BaseModel):
     name: str
     subject: str
     base_url: str
+    capability: str | None
+    description: str | None
     endpoints: list[EndpointSpec]
     created_at: datetime
     updated_at: datetime
@@ -90,4 +94,6 @@ class AgentListItem(BaseModel):
     agent_id: str
     name: str
     subject: str
+    capability: str | None
+    description: str | None
     created_at: datetime

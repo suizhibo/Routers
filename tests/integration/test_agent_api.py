@@ -54,6 +54,8 @@ async def test_register_agent(client):
         "name": "Weather Agent",
         "subject": "svc-test",
         "base_url": "http://weather:8080",
+        "capability": "weather",
+        "description": "Provides weather forecasts",
         "endpoints": [
             {
                 "endpoint_type": "chat",
@@ -70,6 +72,21 @@ async def test_register_agent(client):
     assert resp.status_code == 201
     data = resp.json()
     assert data["agent_id"] == "weather-agent"
+
+    # Verify detail includes new fields
+    resp = await client.get("/v1/agents/weather-agent")
+    assert resp.status_code == 200
+    detail = resp.json()
+    assert detail["capability"] == "weather"
+    assert detail["description"] == "Provides weather forecasts"
+
+    # Verify list includes new fields
+    resp = await client.get("/v1/agents")
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 1
+    assert items[0]["capability"] == "weather"
+    assert items[0]["description"] == "Provides weather forecasts"
 
 
 @pytest.mark.asyncio

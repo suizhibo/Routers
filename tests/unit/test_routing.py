@@ -20,6 +20,9 @@ class FakeAgentRepo:
     async def list_all(self) -> list[Agent]:
         return list(self._agents.values())
 
+    async def list_agents(self) -> list[Agent]:
+        return list(self._agents.values())
+
 
 class FakeRuleRepo:
     def __init__(self, rules: list[RoutingRule]):
@@ -37,8 +40,13 @@ class FakeSessionManager:
         return self._route
 
 
-def _make_agent(agent_id: str, endpoint_type: str) -> Agent:
-    agent = Agent(agent_id=agent_id, name=f"Agent {agent_id}", subject=f"sub-{agent_id}")
+def _make_agent(agent_id: str, endpoint_type: str, capability: str | None = None) -> Agent:
+    agent = Agent(
+        agent_id=agent_id,
+        name=f"Agent {agent_id}",
+        subject=f"sub-{agent_id}",
+        capability=capability,
+    )
     agent.endpoints = [
         AgentEndpoint(
             agent_id=agent_id,
@@ -154,6 +162,75 @@ async def test_l3_rule_no_endpoint_uses_first():
 
 
 
+
+
+# --- L3 Capability-based ---
+
+@pytest.mark.asyncio
+async def test_l3_rule_target_capability_match():
+    rule = RoutingRule(
+        rule_id="r1",
+        priority=10,
+        when_clause={},
+        target_agent_id=None,
+        target_capability="weather",
+        target_instance_id="inst-1",
+        target_endpoint_type="chat",
+        enabled=True,
+    )
+    engine = _make_engine(
+        agents=[_make_agent("agent-a", "ep-1", capability="weather")],
+        rules=[rule],
+    )
+    req = RouteRequest()
+    result = await engine.resolve(req, {})
+    assert result == "agent-a"
+
+
+@pytest.mark.asyncio
+async def test_l3_rule_target_capability_no_match_falls_through():
+    rule = RoutingRule(
+        rule_id="r1",
+        priority=10,
+        when_clause={},
+        target_agent_id=None,
+        target_capability="weather",
+        target_instance_id="inst-1",
+        target_endpoint_type="chat",
+        enabled=True,
+    )
+    engine = _make_engine(
+        agents=[_make_agent("agent-a", "ep-1", capability="translation")],
+        rules=[rule],
+        default_agent_id="agent-default",
+    )
+    req = RouteRequest()
+    result = await engine.resolve(req, {})
+    assert result == "agent-default"
+
+
+@pytest.mark.asyncio
+async def test_l3_rule_target_capability_skips_non_matching_agents():
+    rule = RoutingRule(
+        rule_id="r1",
+        priority=10,
+        when_clause={},
+        target_agent_id=None,
+        target_capability="weather",
+        target_instance_id="inst-1",
+        target_endpoint_type="chat",
+        enabled=True,
+    )
+    engine = _make_engine(
+        agents=[
+            _make_agent("agent-a", "ep-1", capability="translation"),
+            _make_agent("agent-b", "ep-1", capability="weather"),
+        ],
+        rules=[rule],
+    )
+    req = RouteRequest()
+    result = await engine.resolve(req, {})
+    assert result == "agent-b"
 
 
 # --- L5 Default ---
