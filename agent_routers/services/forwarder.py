@@ -213,9 +213,13 @@ class Forwarder:
         if client is None:
             client = self._pool.create(agent_id, base_url)
 
+        session_headers = dict(request.headers)
+        if agent.auth_header and agent.auth_token:
+            session_headers[agent.auth_header] = agent.auth_token
+
         upstream = await client.request(
             endpoint.method, full_url,
-            headers=dict(request.headers), content=body_bytes
+            headers=session_headers, content=body_bytes
         )
         upstream.raise_for_status()
 
@@ -257,6 +261,10 @@ class Forwarder:
         base_url = agent.base_url
         full_url = f"{base_url.rstrip('/')}/{url_path.lstrip('/')}"
 
+        upstream_headers = dict(request.headers)
+        if agent.auth_header and agent.auth_token:
+            upstream_headers[agent.auth_header] = agent.auth_token
+
         # 4. Circuit breaker
         circuit_key = _circuit_key(agent_id, session_id)
         if await _cb.is_open(circuit_key):
@@ -268,12 +276,12 @@ class Forwarder:
 
         if endpoint.mode == "block":
             return await self._forward_block(
-                client, endpoint.method, full_url, dict(request.headers), body_bytes,
+                client, endpoint.method, full_url, upstream_headers, body_bytes,
                 circuit_key,
             )
         else:
             return await self._forward_stream(
-                client, endpoint.method, full_url, dict(request.headers), body_bytes,
+                client, endpoint.method, full_url, upstream_headers, body_bytes,
                 cancel_event, agent_id, session_id,
             )
 

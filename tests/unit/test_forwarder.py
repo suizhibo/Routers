@@ -330,3 +330,75 @@ async def test_forward_get_ignores_body(pool):
 
     call_args = mock_client.request.call_args
     assert call_args.kwargs["content"] == b""
+
+
+@pytest.mark.asyncio
+async def test_forward_injects_auth_headers(pool):
+    agent = _make_agent("block")
+    agent.auth_header = "x-api-key"
+    agent.auth_token = "secret-123"
+    repo = FakeAgentRepo(agent)
+    engine = FakeRoutingEngine("agent-1")
+    fwd = Forwarder(repo, engine, pool)
+
+    mock_response = MagicMock(spec=httpx.Response)
+    mock_response.content = b'{"ok": true}'
+    mock_response.status_code = 200
+    mock_response.headers = {"content-type": "application/json"}
+    mock_response.json = MagicMock(return_value={"ok": True})
+    mock_response.raise_for_status = MagicMock()
+
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_client.request = AsyncMock(return_value=mock_response)
+
+    pool.create("agent-1", "http://localhost:8001")
+    pool._clients["agent-1"] = mock_client
+
+    request = _make_request(body=b'{"msg":"hi"}')
+    route_req = RouteRequest(context={"session_id": "sess-123"})
+    response = await fwd.forward(request, route_req, None)
+
+    assert response.status_code == 200
+    call_kwargs = mock_client.request.call_args.kwargs
+    assert call_kwargs["headers"]["x-api-key"] == "secret-123"
+
+
+@pytest.mark.asyncio
+async def test_forward_auth_overrides_downstream_header(pool):
+    agent = _make_agent("block")
+    agent.auth_header = "x-api-key"
+    agent.auth_token = "agent-secret"
+    repo = FakeAgentRepo(agent)
+    engine = FakeRoutingEngine("agent-1")
+    fwd = Forwarder(repo, engine, pool)
+
+    mock_response = MagicMock(spec=httpx.Response)
+    mock_response.content = b'{"ok": true}'
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.raise_for_status = MagicMock()
+
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_client.request = AsyncMock(return_value=mock_response)
+
+    pool.create("agent-1", "http://localhost:8001")
+    pool._clients["agent-1"] = mock_client
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "headers": [
+            (b"content-type", b"application/json"),
+            (b"x-api-key", b"downstream-secret"),
+        ],
+        "path": "/v1/route",
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+    }
+    request = Request(scope)
+    request._body = b'{}'
+    route_req = RouteRequest(context={"session_id": "sess-123"})
+    await fwd.forward(request, route_req, None)
+
+    call_kwargs = mock_client.request.call_args.kwargs
+    assert call_kwargs["headers"]["x-api-key"] == "agent-secret"
