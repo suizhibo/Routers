@@ -1,0 +1,171 @@
+{
+  "agent_id": "intelligent-kb-agent",
+  "name": "智能知识库智能体",
+  "subject": "intelligent-kb-service",
+  "capability": "knowledge-base",
+  "description": "智能知识库智能体，支持知识库问答、网络搜索和多轮对话",
+  "auth_header": "x-api-key",
+  "auth_token": "your-api-key-here",
+  "base_url": "http://localhost:8080/api/v1",
+  "endpoints": [
+    {
+      "endpoint_type": "create_session",
+      "method": "POST",
+      "path": "/sessions",
+      "path_params": [],
+      "query_params": [],
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "会话标题（可选）"
+          },
+          "description": {
+            "type": "string",
+            "description": "会话描述（可选）"
+          }
+        }
+      },
+      "mode": "block",
+      "idempotent": false,
+      "param_mapping": {
+        "path_params": {},
+        "query_params": {},
+        "body": "options"
+      },
+      "session_config": {
+        "response_header": null,
+        "response_body_path": "data.id"
+      }
+    },
+    {
+      "endpoint_type": "chat",
+      "method": "POST",
+      "path": "/agent-chat/{session_id}",
+      "path_params": [
+        {
+          "name": "session_id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "query_params": [],
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "查询文本"
+          },
+          "knowledge_base_ids": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "知识库 ID 列表"
+          },
+          "knowledge_ids": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "知识文件 ID 列表"
+          },
+          "agent_enabled": {
+            "type": "boolean",
+            "description": "是否启用 Agent 模式"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "自定义 Agent ID"
+          },
+          "web_search_enabled": {
+            "type": "boolean",
+            "description": "是否启用网络搜索"
+          },
+          "summary_model_id": {
+            "type": "string",
+            "description": "覆盖默认的摘要模型 ID"
+          },
+          "mentioned_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string"},
+                "name": {"type": "string"},
+                "type": {"type": "string", "enum": ["kb", "file"]},
+                "kb_type": {"type": "string", "enum": ["document", "faq"]}
+              }
+            },
+            "description": "@提及的知识库和文件列表"
+          },
+          "disable_title": {
+            "type": "boolean",
+            "description": "是否禁用自动标题生成"
+          },
+          "enable_memory": {
+            "type": "boolean",
+            "description": "是否启用记忆功能"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "data": {"type": "string"}
+              }
+            },
+            "description": "附带的图片（base64 格式）"
+          },
+          "channel": {
+            "type": "string",
+            "enum": ["web", "api", "im", "browser_extension"],
+            "description": "来源渠道标识"
+          }
+        },
+        "required": ["query"]
+      },
+      "mode": "stream",
+      "idempotent": false,
+      "param_mapping": {
+        "path_params": {
+          "session_id": "context.session_id"
+        },
+        "query_params": {},
+        "body": "options"
+      },
+      "session_config": null
+    },
+    {
+      "endpoint_type": "stop",
+      "method": "POST",
+      "path": "/sessions/{session_id}/stop",
+      "path_params": [
+        {
+          "name": "session_id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "query_params": [],
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "要停止生成的助手消息 ID"
+          }
+        },
+        "required": ["message_id"]
+      },
+      "mode": "block",
+      "idempotent": false,
+      "param_mapping": {
+        "path_params": {
+          "session_id": "context.session_id"
+        },
+        "query_params": {},
+        "body": "options"
+      },
+      "session_config": null
+    }
+  ]
+}

@@ -9,7 +9,9 @@ CREATE TABLE agents (
     updated_at TIMESTAMP NOT NULL DEFAULT now(),
     base_url VARCHAR(2048) NOT NULL,
     capability VARCHAR(255),
-    description TEXT
+    description TEXT,
+    auth_header VARCHAR(255),
+    auth_token VARCHAR(2048)
 );
 
 CREATE TABLE agent_endpoints (
