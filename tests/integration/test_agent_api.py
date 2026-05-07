@@ -116,3 +116,43 @@ async def test_get_agent_not_found(client):
     resp = await client.get("/v1/agents/nonexistent")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "agent_not_found"
+
+
+@pytest.mark.asyncio
+async def test_register_agent_with_auth(client):
+    payload = {
+        "agent_id": "auth-agent",
+        "name": "Auth Agent",
+        "subject": "svc-test",
+        "base_url": "http://auth:8080",
+        "auth_header": "x-api-key",
+        "auth_token": "secret-123",
+        "endpoints": [
+            {
+                "endpoint_type": "chat",
+                "method": "POST",
+                "path": "/api/chat",
+                "mode": "block",
+                "idempotent": False,
+                "path_params": [],
+                "query_params": [],
+            }
+        ],
+    }
+    resp = await client.post("/v1/agents", json=payload)
+    assert resp.status_code == 201
+
+    # Detail masks token
+    resp = await client.get("/v1/agents/auth-agent")
+    assert resp.status_code == 200
+    detail = resp.json()
+    assert detail["auth_header"] == "x-api-key"
+    assert detail["auth_token"] == "***"
+
+    # List omits token
+    resp = await client.get("/v1/agents")
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 1
+    assert items[0]["auth_header"] == "x-api-key"
+    assert "auth_token" not in items[0]
