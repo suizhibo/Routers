@@ -1,0 +1,2 @@
+name: implement-body-schema-mapping
+description: Extend param_mapping.body to support field-level mapping against body_schema, allowing granular mapping from RouteRequest fields to upstream request body properties

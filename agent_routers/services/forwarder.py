@@ -173,8 +173,22 @@ class Forwarder:
         url_path = _build_url(endpoint.path, path_params, query_params)
 
         body_dict = None
-        if endpoint.method not in IDEMPOTENT_METHODS and mapping.get("body"):
-            body_dict = _extract_value(req_dict, mapping["body"])
+        body_cfg = mapping.get("body")
+        if endpoint.method not in IDEMPOTENT_METHODS and body_cfg:
+            if isinstance(body_cfg, dict):
+                body_dict = {}
+                for target_key, source_path in body_cfg.items():
+                    val = _extract_value(req_dict, source_path)
+                    if val is not None:
+                        body_dict[target_key] = val
+                # Inject defaults from body_schema
+                schema = endpoint.body_schema
+                if schema and schema.get("type") == "object":
+                    for prop_name, prop_schema in schema.get("properties", {}).items():
+                        if prop_name not in body_dict and "default" in prop_schema:
+                            body_dict[prop_name] = prop_schema["default"]
+            else:
+                body_dict = _extract_value(req_dict, body_cfg)
 
         return url_path, body_dict
 

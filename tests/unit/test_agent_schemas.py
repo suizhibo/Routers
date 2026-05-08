@@ -100,3 +100,21 @@ def test_agent_registration_with_auth_fields():
     )
     assert reg.auth_header == "x-api-key"
     assert reg.auth_token == "secret-123"
+
+
+def test_param_mapping_dict_body():
+    pm = ParamMapping(
+        path_params={"session_id": "context.session_id"},
+        body={"query": "input", "kb_ids": "options.knowledge_base_ids"},
+    )
+    assert pm.body == {"query": "input", "kb_ids": "options.knowledge_base_ids"}
+
+
+def test_param_mapping_string_body():
+    pm = ParamMapping(body="options")
+    assert pm.body == "options"
+
+
+def test_param_mapping_none_body():
+    pm = ParamMapping()
+    assert pm.body is None

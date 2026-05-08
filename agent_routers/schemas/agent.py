@@ -30,7 +30,7 @@ class HTTPMethod(str, Enum):
 class ParamMapping(BaseModel):
     path_params: dict[str, str] = Field(default_factory=dict)
     query_params: dict[str, str] = Field(default_factory=dict)
-    body: str | None = None
+    body: str | dict[str, str] | None = None
 
 
 class SessionConfig(BaseModel):

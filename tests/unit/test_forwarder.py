@@ -107,7 +107,7 @@ class FakeRoutingEngine:
         return self._result
 
 
-def _make_agent(endpoint_mode: str = "block", param_mapping=None, session_config=None) -> Agent:
+def _make_agent(endpoint_mode: str = "block", param_mapping=None, session_config=None, body_schema=None) -> Agent:
     if param_mapping is None:
         param_mapping = {"path_params": {}, "query_params": {}, "body": None}
     agent = Agent(
@@ -124,7 +124,7 @@ def _make_agent(endpoint_mode: str = "block", param_mapping=None, session_config
             path="/chat",
             path_params=[],
             query_params=[],
-            body_schema=None,
+            body_schema=body_schema,
             mode=endpoint_mode,
             idempotent=False,
             param_mapping=param_mapping,
@@ -373,6 +373,73 @@ async def test_forward_get_ignores_body(pool):
 
     call_args = mock_session.request.call_args
     assert "json" not in call_args.kwargs
+
+
+@pytest.mark.asyncio
+async def test_forward_dict_body_mapping(pool):
+    param_mapping = {
+        "path_params": {},
+        "query_params": {},
+        "body": {"query": "input", "kb_ids": "options.knowledge_base_ids"},
+    }
+    agent = _make_agent("block", param_mapping=param_mapping)
+    repo = FakeAgentRepo(agent)
+    engine = FakeRoutingEngine("agent-1")
+    fwd = Forwarder(repo, engine, pool)
+
+    response = _mock_response(status=200, body=b"{}")
+    cm = _request_cm_for(response)
+    mock_session = _mock_session(request_side_effect=lambda *a, **kw: cm())
+
+    pool.create("agent-1", "http://localhost:8001")
+    pool._sessions["agent-1"] = mock_session
+
+    route_req = RouteRequest(
+        input="hello",
+        context={"session_id": "sess-123"},
+        options={"knowledge_base_ids": ["kb1"]},
+    )
+    request = _make_request()
+    response_out = await fwd.forward(request, route_req, None)
+
+    assert response_out.status_code == 200
+    call_args = mock_session.request.call_args
+    assert call_args.kwargs["json"] == {"query": "hello", "kb_ids": ["kb1"]}
+
+
+@pytest.mark.asyncio
+async def test_forward_dict_body_with_schema_defaults(pool):
+    param_mapping = {
+        "path_params": {},
+        "query_params": {},
+        "body": {"query": "input"},
+    }
+    body_schema = {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "disable_title": {"type": "boolean", "default": False},
+        },
+    }
+    agent = _make_agent("block", param_mapping=param_mapping, body_schema=body_schema)
+    repo = FakeAgentRepo(agent)
+    engine = FakeRoutingEngine("agent-1")
+    fwd = Forwarder(repo, engine, pool)
+
+    response = _mock_response(status=200, body=b"{}")
+    cm = _request_cm_for(response)
+    mock_session = _mock_session(request_side_effect=lambda *a, **kw: cm())
+
+    pool.create("agent-1", "http://localhost:8001")
+    pool._sessions["agent-1"] = mock_session
+
+    route_req = RouteRequest(input="hello", context={"session_id": "sess-123"}, options={})
+    request = _make_request()
+    response_out = await fwd.forward(request, route_req, None)
+
+    assert response_out.status_code == 200
+    call_args = mock_session.request.call_args
+    assert call_args.kwargs["json"] == {"query": "hello", "disable_title": False}
 
 
 @pytest.mark.asyncio
