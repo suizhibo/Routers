@@ -20,5 +20,7 @@ class AuditEvent(Base):
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     request_headers_digest: Mapped[str | None] = mapped_column(Text, nullable=True)
     response_headers_digest: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     signature: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)

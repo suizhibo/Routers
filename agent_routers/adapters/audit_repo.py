@@ -23,6 +23,8 @@ class AuditRepository:
                 latency_ms=event.get("latency_ms"),
                 request_headers_digest=event.get("request_headers_digest") or None,
                 response_headers_digest=event.get("response_headers_digest") or None,
+                request_body=event.get("request_body") or None,
+                response_body=event.get("response_body") or None,
                 signature=event["signature"],
             )
             session.add(audit_event)

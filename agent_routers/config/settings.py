@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     AUDIT_HMAC_KEY: str = "change-me-in-production"
+    AUDIT_MAX_BODY_BYTES: int = 65536
     QUOTA_DEFAULT_PER_MINUTE: int = 120
     DRAIN_TIMEOUT_SECONDS: int = 15
     DEFAULT_AGENT_ID: str = ""
