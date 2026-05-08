@@ -4,6 +4,10 @@
 # OS
 .DS_Store
 
+# Tool directories
+.claude/
+.sisyphus/
+
 # IDE
 .idea/
 .vscode/
