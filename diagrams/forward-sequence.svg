@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 950" width="960" height="950">
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  </style>
+  <defs>
+    <marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker>
+    <marker id="ag" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker>
+    <marker id="ad" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker>
+  </defs>
+  <rect width="960" height="950" fill="#ffffff"/>
+  <text x="480" y="32" text-anchor="middle" fill="#111827" font-size="18" font-weight="600">请求转发时序图（POST /v1/route）</text>
+  <rect x="30.0" y="50" width="100" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="80" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">Client</text>
+  <line x1="80" y1="86" x2="80" y2="900" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="170.0" y="50" width="100" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="220" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">FastAPI</text>
+  <line x1="220" y1="86" x2="220" y2="900" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="310.0" y="50" width="100" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="360" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">JWTAuth</text>
+  <line x1="360" y1="86" x2="360" y2="900" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="450.0" y="50" width="100" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="500" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">Quota</text>
+  <line x1="500" y1="86" x2="500" y2="900" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="610.0" y="50" width="100" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="660" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">Forwarder</text>
+  <line x1="660" y1="86" x2="660" y2="900" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="830.0" y="50" width="100" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="880" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">Agent</text>
+  <line x1="880" y1="86" x2="880" y2="900" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="80" y1="110" x2="220" y2="110" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="90.0" y="96" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="150.0" y="108" text-anchor="middle" fill="#374151" font-size="10">POST /v1/route</text>
+  <line x1="220" y1="150" x2="360" y2="150" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="230.0" y="136" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="290.0" y="148" text-anchor="middle" fill="#374151" font-size="10">dispatch (Bearer token)</text>
+  <line x1="360" y1="190" x2="220" y2="190" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="240.0" y="176" width="100" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="290.0" y="188" text-anchor="middle" fill="#374151" font-size="10">set request.state.auth</text>
+  <line x1="220" y1="230" x2="500" y2="230" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="300.0" y="216" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="360.0" y="228" text-anchor="middle" fill="#374151" font-size="10">dispatch</text>
+  <rect x="505" y="260" width="110" height="20" rx="4" fill="#f0fdf4" stroke="#16a34a" stroke-width="1"/>
+  <text x="560" y="274" text-anchor="middle" fill="#166534" font-size="9">check Redis quota</text>
+  <line x1="500" y1="310" x2="220" y2="310" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="310.0" y="296" width="100" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="360.0" y="308" text-anchor="middle" fill="#374151" font-size="10">allow / 429</text>
+  <line x1="220" y1="350" x2="660" y2="350" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="380.0" y="336" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="440.0" y="348" text-anchor="middle" fill="#374151" font-size="10">forward(req, route_req)</text>
+  <line x1="660" y1="390" x2="660" y2="390" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="600.0" y="376" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="660.0" y="388" text-anchor="middle" fill="#374151" font-size="10">resolve(route_req)</text>
+  <rect x="665" y="420" width="110" height="20" rx="4" fill="#f0fdf4" stroke="#16a34a" stroke-width="1"/>
+  <text x="720" y="434" text-anchor="middle" fill="#166534" font-size="9">SessionManager.get_route()</text>
+  <rect x="665" y="460" width="110" height="20" rx="4" fill="#f0fdf4" stroke="#16a34a" stroke-width="1"/>
+  <text x="720" y="474" text-anchor="middle" fill="#166534" font-size="9">RuleRepo.list_enabled()</text>
+  <rect x="665" y="500" width="110" height="20" rx="4" fill="#f0fdf4" stroke="#16a34a" stroke-width="1"/>
+  <text x="720" y="514" text-anchor="middle" fill="#166534" font-size="9">AgentRepo.get_by_id()</text>
+  <line x1="660" y1="550" x2="660" y2="550" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="610.0" y="536" width="100" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="660.0" y="548" text-anchor="middle" fill="#374151" font-size="10">return agent_id</text>
+  <line x1="660" y1="590" x2="880" y2="590" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="710.0" y="576" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="770.0" y="588" text-anchor="middle" fill="#374151" font-size="10">HTTP chat endpoint</text>
+  <line x1="880" y1="630" x2="660" y2="630" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="720.0" y="616" width="100" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="770.0" y="628" text-anchor="middle" fill="#374151" font-size="10">response / SSE chunks</text>
+  <line x1="660" y1="670" x2="220" y2="670" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="390.0" y="656" width="100" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="440.0" y="668" text-anchor="middle" fill="#374151" font-size="10">Response / StreamingResponse</text>
+  <line x1="220" y1="710" x2="80" y2="710" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="100.0" y="696" width="100" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="150.0" y="708" text-anchor="middle" fill="#374151" font-size="10">HTTP response</text>
+  <rect x="225" y="740" width="110" height="20" rx="4" fill="#f0fdf4" stroke="#16a34a" stroke-width="1"/>
+  <text x="280" y="754" text-anchor="middle" fill="#166534" font-size="9">AuditMiddleware.async write</text>
+  <rect x="216" y="110" width="8" height="680" rx="3" fill="#bfdbfe" opacity="0.5"/>
+  <rect x="356" y="150" width="8" height="80" rx="3" fill="#bfdbfe" opacity="0.5"/>
+  <rect x="496" y="230" width="8" height="80" rx="3" fill="#bfdbfe" opacity="0.5"/>
+  <rect x="656" y="310" width="8" height="440" rx="3" fill="#bfdbfe" opacity="0.5"/>
+</svg>

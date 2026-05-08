@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 720" width="960" height="720">
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  </style>
+  <defs>
+    <marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker>
+    <marker id="ad" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker>
+  </defs>
+  <rect width="960" height="720" fill="#ffffff"/>
+  <text x="480" y="32" text-anchor="middle" fill="#111827" font-size="18" font-weight="600">Agent 注册时序图（POST /v1/agents）</text>
+  <rect x="30.0" y="50" width="120" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="90" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">Agent开发者</text>
+  <line x1="90" y1="86" x2="90" y2="680" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="190.0" y="50" width="120" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="250" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">FastAPI</text>
+  <line x1="250" y1="86" x2="250" y2="680" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="330.0" y="50" width="120" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="390" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">JWTAuth</text>
+  <line x1="390" y1="86" x2="390" y2="680" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="480.0" y="50" width="120" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="540" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">AgentRegistry</text>
+  <line x1="540" y1="86" x2="540" y2="680" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="640.0" y="50" width="120" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="700" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">AgentRepo</text>
+  <line x1="700" y1="86" x2="700" y2="680" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="810.0" y="50" width="120" height="36" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="870" y="73" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">ClientPool</text>
+  <line x1="870" y1="86" x2="870" y2="680" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="90" y1="110" x2="250" y2="110" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="100.0" y="96" width="140" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="170.0" y="108" text-anchor="middle" fill="#374151" font-size="10">POST /v1/agents + JWT</text>
+  <line x1="250" y1="150" x2="390" y2="150" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="250.0" y="136" width="140" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="320.0" y="148" text-anchor="middle" fill="#374151" font-size="10">verify_token()</text>
+  <line x1="390" y1="190" x2="250" y2="190" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="260.0" y="176" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="320.0" y="188" text-anchor="middle" fill="#374151" font-size="10">AuthContext(sub, role)</text>
+  <line x1="250" y1="230" x2="540" y2="230" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="325.0" y="216" width="140" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="395.0" y="228" text-anchor="middle" fill="#374151" font-size="10">registry.register()</text>
+  <line x1="540" y1="270" x2="700" y2="270" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="550.0" y="256" width="140" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="620.0" y="268" text-anchor="middle" fill="#374151" font-size="10">repo.create()</text>
+  <line x1="700" y1="310" x2="700" y2="310" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="630.0" y="296" width="140" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="700.0" y="308" text-anchor="middle" fill="#374151" font-size="10">INSERT agents + endpoints</text>
+  <line x1="700" y1="350" x2="540" y2="350" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="560.0" y="336" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="620.0" y="348" text-anchor="middle" fill="#374151" font-size="10">Agent model</text>
+  <line x1="540" y1="390" x2="250" y2="390" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="335.0" y="376" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="395.0" y="388" text-anchor="middle" fill="#374151" font-size="10">AgentRegistrationResponse</text>
+  <line x1="250" y1="430" x2="870" y2="430" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <rect x="490.0" y="416" width="140" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="560.0" y="428" text-anchor="middle" fill="#374151" font-size="10">client_pool.create()</text>
+  <line x1="870" y1="470" x2="250" y2="470" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="500.0" y="456" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="560.0" y="468" text-anchor="middle" fill="#374151" font-size="10">aiohttp ClientSession</text>
+  <line x1="250" y1="510" x2="90" y2="510" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ad)"/>
+  <rect x="110.0" y="496" width="120" height="16" fill="#ffffff" opacity="0.95"/>
+  <text x="170.0" y="508" text-anchor="middle" fill="#374151" font-size="10">201 Created + agent_id</text>
+  <rect x="246" y="110" width="8" height="440" rx="3" fill="#bfdbfe" opacity="0.5"/>
+  <rect x="386" y="150" width="8" height="80" rx="3" fill="#bfdbfe" opacity="0.5"/>
+  <rect x="536" y="230" width="8" height="160" rx="3" fill="#bfdbfe" opacity="0.5"/>
+  <rect x="696" y="270" width="8" height="80" rx="3" fill="#bfdbfe" opacity="0.5"/>
+  <rect x="866" y="390" width="8" height="80" rx="3" fill="#bfdbfe" opacity="0.5"/>
+</svg>

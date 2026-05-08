@@ -1,0 +1,2 @@
+name: agent-auth-credentials
+description: Add per-agent authentication credentials (header-based) for upstream agent calls

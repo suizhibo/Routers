@@ -1,0 +1,2 @@
+name: audit-request-response-content
+description: Record full request and response body content in audit logs for every session interaction

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 780" width="960" height="780">
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  </style>
+  <defs>
+    <marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker>
+    <marker id="ag" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker>
+    <marker id="ao" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/></marker>
+    <marker id="ap" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/></marker>
+  </defs>
+  <rect width="960" height="780" fill="#ffffff"/>
+  <text x="480" y="32" text-anchor="middle" fill="#111827" font-size="18" font-weight="600">AgentRouters 系统架构图</text>
+  <rect x="40" y="50" width="880" height="70" rx="6" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="68" fill="#6b7280" font-size="10" font-weight="600" letter-spacing="0.06em">外部系统</text>
+  <rect x="40" y="140" width="880" height="80" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="158" fill="#6b7280" font-size="10" font-weight="600" letter-spacing="0.06em">API 层 (FastAPI)</text>
+  <rect x="40" y="240" width="880" height="70" rx="6" fill="#fff7ed" stroke="#fed7aa" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="258" fill="#6b7280" font-size="10" font-weight="600" letter-spacing="0.06em">中间件 (横切关注点)</text>
+  <rect x="40" y="340" width="880" height="90" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="358" fill="#6b7280" font-size="10" font-weight="600" letter-spacing="0.06em">业务逻辑层 (Services)</text>
+  <rect x="40" y="450" width="880" height="90" rx="6" fill="#faf5ff" stroke="#e9d5ff" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="468" fill="#6b7280" font-size="10" font-weight="600" letter-spacing="0.06em">适配器层 (Adapters)</text>
+  <rect x="40" y="560" width="880" height="80" rx="6" fill="#f0fdfa" stroke="#99f6e4" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="578" fill="#6b7280" font-size="10" font-weight="600" letter-spacing="0.06em">存储与外部服务</text>
+  <rect x="100" y="72" width="120" height="40" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <rect x="100" y="72" width="120" height="18" rx="6" fill="#374151" stroke="none"/>
+  <rect x="100" y="84" width="120" height="6" fill="#374151" stroke="none"/>
+  <circle cx="112" cy="81" r="3" fill="#ef4444" opacity="0.8"/>
+  <circle cx="124" cy="81" r="3" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="136" cy="81" r="3" fill="#10b981" opacity="0.8"/>
+  <text x="160" y="105" text-anchor="middle" fill="#374151" font-size="12" font-weight="600">Client</text>
+  <rect x="740" y="72" width="140" height="40" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="810" y="98" text-anchor="middle" fill="#111827" font-size="12" font-weight="600">Agent Service</text>
+  <rect x="420" y="72" width="120" height="40" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="480" y="98" text-anchor="middle" fill="#111827" font-size="12" font-weight="600">JWKS Server</text>
+  <rect x="80" y="168" width="105" height="36" rx="6" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="132" y="190" text-anchor="middle" fill="#2563eb" font-size="11" font-weight="600">/health</text>
+  <rect x="200" y="168" width="105" height="36" rx="6" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="252" y="190" text-anchor="middle" fill="#2563eb" font-size="11" font-weight="600">/v1/agents</text>
+  <rect x="330" y="168" width="105" height="36" rx="6" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="382" y="190" text-anchor="middle" fill="#2563eb" font-size="11" font-weight="600">/v1/route</text>
+  <rect x="460" y="168" width="105" height="36" rx="6" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="512" y="190" text-anchor="middle" fill="#2563eb" font-size="11" font-weight="600">/v1/rules</text>
+  <rect x="590" y="168" width="105" height="36" rx="6" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="642" y="190" text-anchor="middle" fill="#2563eb" font-size="11" font-weight="600">/v1/audit</text>
+  <rect x="720" y="168" width="105" height="36" rx="6" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="772" y="190" text-anchor="middle" fill="#2563eb" font-size="11" font-weight="600">/v1/requests</text>
+  <rect x="130" y="262" width="130" height="36" rx="6" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+  <text x="195" y="285" text-anchor="middle" fill="#c2410c" font-size="12" font-weight="600">RequestId</text>
+  <rect x="330" y="262" width="130" height="36" rx="6" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+  <text x="395" y="285" text-anchor="middle" fill="#c2410c" font-size="12" font-weight="600">JWTAuth</text>
+  <rect x="530" y="262" width="130" height="36" rx="6" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+  <text x="595" y="285" text-anchor="middle" fill="#c2410c" font-size="12" font-weight="600">Quota</text>
+  <rect x="730" y="262" width="130" height="36" rx="6" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+  <text x="795" y="285" text-anchor="middle" fill="#c2410c" font-size="12" font-weight="600">Audit</text>
+  <rect x="70" y="372" width="130" height="40" rx="8" fill="#dcfce7" stroke="#22c55e" stroke-width="2"/>
+  <text x="135" y="398" text-anchor="middle" fill="#166534" font-size="12" font-weight="700">Forwarder</text>
+  <rect x="230" y="372" width="130" height="40" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="295" y="398" text-anchor="middle" fill="#166534" font-size="12" font-weight="600">RoutingEngine</text>
+  <rect x="400" y="372" width="130" height="40" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="465" y="398" text-anchor="middle" fill="#166534" font-size="12" font-weight="600">Registry</text>
+  <rect x="550" y="372" width="130" height="40" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="615" y="398" text-anchor="middle" fill="#166534" font-size="12" font-weight="600">SessionManager</text>
+  <rect x="730" y="372" width="130" height="40" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="795" y="398" text-anchor="middle" fill="#166534" font-size="12" font-weight="600">Coordination</text>
+  <rect x="60" y="482" width="110" height="40" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="115" y="508" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="600">AgentRepo</text>
+  <rect x="190" y="482" width="110" height="40" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="245" y="508" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="600">RuleRepo</text>
+  <rect x="320" y="482" width="110" height="40" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="375" y="508" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="600">AuditRepo</text>
+  <rect x="450" y="482" width="110" height="40" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="505" y="508" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="600">HTTPClient</text>
+  <rect x="590" y="482" width="110" height="40" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="645" y="508" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="600">JWKS</text>
+  <rect x="710" y="482" width="110" height="40" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="765" y="508" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="600">RedisQuota</text>
+  <ellipse cx="260" cy="590" rx="60" ry="14" fill="#dbeafe" stroke="#60a5fa" stroke-width="1.5"/>
+  <rect x="200" y="590" width="120" height="40" fill="#dbeafe" stroke="none"/>
+  <line x1="200" y1="590" x2="200" y2="630" stroke="#60a5fa" stroke-width="1.5"/>
+  <line x1="320" y1="590" x2="320" y2="630" stroke="#60a5fa" stroke-width="1.5"/>
+  <ellipse cx="260" cy="630" rx="60" ry="14" fill="#93c5fd" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="260" y="616" text-anchor="middle" fill="#1e3a8a" font-size="11" font-weight="600">PostgreSQL</text>
+  <rect x="460" y="590" width="100" height="40" rx="8" fill="#fee2e2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="510" y="616" text-anchor="middle" fill="#991b1b" font-size="12" font-weight="600">Redis</text>
+  <line x1="160" y1="112" x2="382" y2="168" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <path d="M 382 204 L 382 240 L 60 240 L 60 340 L 70 340 L 70 372" stroke="#2563eb" stroke-width="1.5" fill="none" marker-end="url(#ab)"/>
+  <line x1="200" y1="392" x2="230" y2="392" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+  <path d="M 135 412 L 135 450 L 505 450 L 505 482" stroke="#2563eb" stroke-width="1.5" fill="none" marker-end="url(#ab)"/>
+  <path d="M 560 522 L 560 560 L 900 560 L 900 112" stroke="#2563eb" stroke-width="1.5" fill="none" marker-end="url(#ab)"/>
+  <line x1="360" y1="392" x2="550" y2="392" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/>
+  <path d="M 615 412 L 615 450 L 510 450 L 510 560 L 510 590" stroke="#16a34a" stroke-width="1.5" fill="none" marker-end="url(#ag)"/>
+  <path d="M 295 412 L 295 450 L 240 450 L 240 482" stroke="#16a34a" stroke-width="1.5" fill="none" marker-end="url(#ag)"/>
+  <path d="M 465 412 L 465 450 L 110 450 L 110 482" stroke="#16a34a" stroke-width="1.5" fill="none" marker-end="url(#ag)"/>
+  <path d="M 110 522 L 110 560 L 200 560 L 200 590" stroke="#16a34a" stroke-width="1.5" fill="none" marker-end="url(#ag)"/>
+  <path d="M 240 522 L 240 560 L 260 560 L 260 590" stroke="#16a34a" stroke-width="1.5" fill="none" marker-end="url(#ag)"/>
+  <path d="M 370 522 L 370 560 L 320 560 L 320 590" stroke="#16a34a" stroke-width="1.5" fill="none" marker-end="url(#ag)"/>
+  <path d="M 395 298 L 395 340 L 480 340 L 480 112" stroke="#9333ea" stroke-width="1.5" fill="none" marker-end="url(#ap)"/>
+  <path d="M 595 298 L 595 340 L 620 340 L 620 450 L 620 560 L 560 560 L 560 590" stroke="#9333ea" stroke-width="1.5" fill="none" marker-end="url(#ap)"/>
+  <path d="M 795 298 L 795 340 L 370 340 L 370 450 L 370 482" stroke="#ea580c" stroke-width="1.5" fill="none" marker-end="url(#ao)"/>
+  <line x1="260" y1="280" x2="330" y2="280" stroke="#fdba74" stroke-width="1.5" marker-end="url(#ao)"/>
+  <line x1="460" y1="280" x2="530" y2="280" stroke="#fdba74" stroke-width="1.5" marker-end="url(#ao)"/>
+  <line x1="660" y1="280" x2="730" y2="280" stroke="#fdba74" stroke-width="1.5" marker-end="url(#ao)"/>
+  <g transform="translate(40, 690)">
+    <line x1="0" y1="8" x2="25" y2="8" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+    <text x="32" y="12" fill="#6b7280" font-size="11">主请求流</text>
+    <line x1="110" y1="8" x2="135" y2="8" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/>
+    <text x="142" y="12" fill="#6b7280" font-size="11">数据查询流</text>
+    <line x1="230" y1="8" x2="255" y2="8" stroke="#ea580c" stroke-width="1.5" marker-end="url(#ao)"/>
+    <text x="262" y="12" fill="#6b7280" font-size="11">审计流</text>
+    <line x1="320" y1="8" x2="345" y2="8" stroke="#9333ea" stroke-width="1.5" marker-end="url(#ap)"/>
+    <text x="352" y="12" fill="#6b7280" font-size="11">认证/限流</text>
+  </g>
+</svg>
