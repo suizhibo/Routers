@@ -6,7 +6,7 @@ import logging
 from typing import Any, AsyncIterator
 from urllib.parse import urlencode
 
-import httpx
+import aiohttp
 import tenacity
 from purgatory.service._async.circuitbreaker import AsyncCircuitBreakerFactory
 from purgatory.service._async.unit_of_work import AsyncInMemoryUnitOfWork
@@ -74,9 +74,9 @@ def _retry_if_not_cancelled(retry_state: tenacity.RetryCallState) -> bool:
 
 
 def _is_retryable_http_error(exc: BaseException) -> bool:
-    if not isinstance(exc, httpx.HTTPStatusError):
+    if not isinstance(exc, aiohttp.ClientResponseError):
         return False
-    return 500 <= exc.response.status_code <= 599
+    return 500 <= exc.status <= 599
 
 
 def _extract_value(data: dict[str, Any], dot_path: str) -> Any:
@@ -98,6 +98,25 @@ def _build_url(
     if query_params:
         url = f"{url}?{urlencode(query_params)}"
     return url
+
+
+_HOP_BY_HOP_HEADERS = {
+    "content-length",
+    "content-encoding",
+    "transfer-encoding",
+    "connection",
+    "keep-alive",
+    "upgrade",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "host",
+}
+
+
+def _filter_headers(headers: dict[str, str]) -> dict[str, str]:
+    return {k: v for k, v in headers.items() if k.lower() not in _HOP_BY_HOP_HEADERS}
 
 
 def _serialize_body(value: Any) -> bytes:
@@ -134,7 +153,7 @@ class Forwarder:
         self,
         route_req: RouteRequest,
         endpoint: AgentEndpoint,
-    ) -> tuple[str, bytes]:
+    ) -> tuple[str, Any]:
         """Build full URL and body from route request and endpoint mapping."""
         req_dict = route_req.model_dump()
         mapping = endpoint.param_mapping or {}
@@ -153,15 +172,16 @@ class Forwarder:
 
         url_path = _build_url(endpoint.path, path_params, query_params)
 
-        body_bytes = b""
+        body_dict = None
         if endpoint.method not in IDEMPOTENT_METHODS and mapping.get("body"):
-            body_value = _extract_value(req_dict, mapping["body"])
-            body_bytes = _serialize_body(body_value)
+            body_dict = _extract_value(req_dict, mapping["body"])
 
-        return url_path, body_bytes
+        return url_path, body_dict
 
     @staticmethod
-    def _extract_session_id(upstream: httpx.Response, endpoint: AgentEndpoint) -> str | None:
+    async def _extract_session_id(
+        upstream: aiohttp.ClientResponse, endpoint: AgentEndpoint
+    ) -> str | None:
         """Extract session_id from upstream response using endpoint session config."""
         session_config = endpoint.session_config
         if not session_config:
@@ -178,11 +198,11 @@ class Forwarder:
             content_type = upstream.headers.get("content-type", "")
             if "application/json" in content_type:
                 try:
-                    body_json = upstream.json()
+                    body_json = await upstream.json()
                     result = _extract_value(body_json, response_body_path)
                     if isinstance(result, str):
                         return result
-                except (json.JSONDecodeError, ValueError):
+                except (aiohttp.ContentTypeError, json.JSONDecodeError, ValueError):
                     pass
 
         return None
@@ -205,7 +225,7 @@ class Forwarder:
 
         endpoint = self._find_endpoint(agent, "create_session")
 
-        url_path, body_bytes = self._build_request(create_req, endpoint)
+        url_path, body_dict = self._build_request(create_req, endpoint)
         base_url = agent.base_url
         full_url = f"{base_url.rstrip('/')}/{url_path.lstrip('/')}"
 
@@ -213,17 +233,17 @@ class Forwarder:
         if client is None:
             client = self._pool.create(agent_id, base_url)
 
-        session_headers = dict(request.headers)
+        session_headers = _filter_headers(dict(request.headers))
         if agent.auth_header and agent.auth_token:
             session_headers[agent.auth_header] = agent.auth_token
 
-        upstream = await client.request(
+        async with client.request(
             endpoint.method, full_url,
-            headers=session_headers, content=body_bytes
-        )
-        upstream.raise_for_status()
+            headers=session_headers, json=body_dict,
+        ) as upstream:
+            upstream.raise_for_status()
+            session_id = await self._extract_session_id(upstream, endpoint)
 
-        session_id = self._extract_session_id(upstream, endpoint)
         if not session_id:
             raise AgentUnavailableError("Failed to extract session_id from create-session response")
 
@@ -257,11 +277,11 @@ class Forwarder:
         endpoint = self._find_endpoint(agent, "chat")
 
         # Build request
-        url_path, body_bytes = self._build_request(route_req, endpoint)
+        url_path, body_dict = self._build_request(route_req, endpoint)
         base_url = agent.base_url
         full_url = f"{base_url.rstrip('/')}/{url_path.lstrip('/')}"
 
-        upstream_headers = dict(request.headers)
+        upstream_headers = _filter_headers(dict(request.headers))
         if agent.auth_header and agent.auth_token:
             upstream_headers[agent.auth_header] = agent.auth_token
 
@@ -276,12 +296,12 @@ class Forwarder:
 
         if endpoint.mode == "block":
             return await self._forward_block(
-                client, endpoint.method, full_url, upstream_headers, body_bytes,
+                client, endpoint.method, full_url, upstream_headers, body_dict,
                 circuit_key,
             )
         else:
             return await self._forward_stream(
-                client, endpoint.method, full_url, upstream_headers, body_bytes,
+                client, endpoint.method, full_url, upstream_headers, body_dict,
                 cancel_event, agent_id, session_id,
             )
 
@@ -293,47 +313,54 @@ class Forwarder:
     )
     async def _forward_block(
         self,
-        client: httpx.AsyncClient,
+        client: aiohttp.ClientSession,
         method: str,
         url: str,
         headers: dict[str, Any],
-        body: bytes,
+        body: Any,
         circuit_key: str,
     ) -> Response:
-        try:
-            upstream = await client.request(method, url, headers=headers, content=body)
-        except httpx.HTTPStatusError as e:
-            if 500 <= e.response.status_code <= 599:
-                await _cb.record_failure(circuit_key)
-            raise
-        else:
-            if 500 <= upstream.status_code <= 599:
+        kwargs: dict[str, Any] = {"headers": headers}
+        if body is not None:
+            kwargs["json"] = body
+
+        async with client.request(method, url, **kwargs) as upstream:
+            status = upstream.status
+            content = await upstream.read()
+            resp_headers = dict(upstream.headers)
+
+            if 500 <= status <= 599:
                 await _cb.record_failure(circuit_key)
             else:
                 await _cb.record_success(circuit_key)
 
-        upstream.raise_for_status()
+            upstream.raise_for_status()
+
         return Response(
-            content=upstream.content,
-            status_code=upstream.status_code,
-            headers=dict(upstream.headers),
+            content=content,
+            status_code=status,
+            headers=_filter_headers(resp_headers),
         )
 
     async def _forward_stream(
         self,
-        client: httpx.AsyncClient,
+        client: aiohttp.ClientSession,
         method: str,
         url: str,
         headers: dict[str, Any],
-        body: bytes,
+        body: Any,
         cancel_event: asyncio.Event | None,
         agent_id: str,
         session_id: str | None,
     ) -> StreamingResponse:
+        kwargs: dict[str, Any] = {"headers": headers}
+        if body is not None:
+            kwargs["json"] = body
+
         async def generator() -> AsyncIterator[bytes]:
             try:
-                async with client.stream(method, url, headers=headers, content=body) as upstream:
-                    async for chunk in upstream.aiter_bytes():
+                async with client.request(method, url, **kwargs) as upstream:
+                    async for chunk in upstream.content.iter_any():
                         if cancel_event is not None and cancel_event.is_set():
                             logger.info("stream_cancelled")
                             break

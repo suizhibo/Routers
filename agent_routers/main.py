@@ -122,6 +122,7 @@ def make_app() -> FastAPI:
                 "error": {
                     "code": "validation_error",
                     "message": "Request validation failed",
+                    "details": exc.errors(),
                     "request_id": getattr(request.state, "request_id", None),
                 }
             },

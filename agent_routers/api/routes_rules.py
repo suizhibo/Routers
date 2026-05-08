@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from agent_routers.api.dependencies import get_auth, AuthContext
 from agent_routers.adapters.rule_repo import RuleRepository
@@ -10,7 +10,7 @@ from agent_routers.schemas.rule import RoutingRuleCreate, RoutingRuleDetail, Rou
 router = APIRouter(prefix="/v1/rules", tags=["rules"])
 
 
-def get_rule_repo(request) -> RuleRepository:
+def get_rule_repo(request: Request) -> RuleRepository:
     return request.app.state.rule_repo
 
 

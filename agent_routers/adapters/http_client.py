@@ -1,52 +1,51 @@
 from __future__ import annotations
 
-import httpx
 import logging
+
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
 
 class PerAgentClientPool:
-    LIMITS = httpx.Limits(
-        max_connections=50,
-        max_keepalive_connections=20,
-        keepalive_expiry=60.0,
+    CONNECTOR_KW = dict(
+        limit=50,
+        limit_per_host=20,
+        keepalive_timeout=60.0,
     )
-    TIMEOUT = httpx.Timeout(
-        connect=2.0,
-        read=30.0,
-        write=10.0,
-        pool=5.0,
+    TIMEOUT = aiohttp.ClientTimeout(
+        sock_connect=2.0,
+        sock_read=30.0,
+        total=None,
     )
 
-    def __init__(self):
-        self._clients: dict[str, httpx.AsyncClient] = {}
+    def __init__(self) -> None:
+        self._sessions: dict[str, aiohttp.ClientSession] = {}
 
-    def create(self, agent_id: str, base_url: str) -> httpx.AsyncClient:
-        if agent_id in self._clients:
+    def create(self, agent_id: str, base_url: str) -> aiohttp.ClientSession:
+        if agent_id in self._sessions:
             raise ValueError(f"Client for agent '{agent_id}' already exists")
-        client = httpx.AsyncClient(
-            base_url=base_url,
-            limits=self.LIMITS,
+        connector = aiohttp.TCPConnector(**self.CONNECTOR_KW)
+        session = aiohttp.ClientSession(
+            connector=connector,
             timeout=self.TIMEOUT,
-            follow_redirects=True,
         )
-        self._clients[agent_id] = client
+        self._sessions[agent_id] = session
         logger.info("agent_client_created", extra={"agent_id": agent_id, "base_url": base_url})
-        return client
+        return session
 
-    def get(self, agent_id: str) -> httpx.AsyncClient | None:
-        return self._clients.get(agent_id)
+    def get(self, agent_id: str) -> aiohttp.ClientSession | None:
+        return self._sessions.get(agent_id)
 
     def destroy(self, agent_id: str) -> None:
-        client = self._clients.pop(agent_id, None)
-        if client:
+        session = self._sessions.pop(agent_id, None)
+        if session is not None:
             logger.info("agent_client_destroyed", extra={"agent_id": agent_id})
 
     async def close_all(self) -> None:
-        for agent_id, client in list(self._clients.items()):
-            await client.aclose()
-        self._clients.clear()
+        for _agent_id, session in list(self._sessions.items()):
+            await session.close()
+        self._sessions.clear()
 
 
 _client_pool: PerAgentClientPool | None = None

@@ -128,8 +128,7 @@ async def run_tests():
             "priority": 10,
             "when_clause": {"header.region": "us-east"},
             "target_agent_id": "test-agent-1",
-            "target_instance_id": "inst-1",
-            "target_endpoint_id": "chat",
+            "target_endpoint_type": "chat",
             "enabled": True,
         }
 

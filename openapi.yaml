@@ -169,45 +169,27 @@ paths:
       - rules
       summary: List Rules
       operationId: list_rules_v1_rules_get
-      parameters:
-      - name: request
-        in: query
-        required: true
-        schema:
-          title: Request
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                type: array
                 items:
                   $ref: '#/components/schemas/RoutingRuleDetail'
+                type: array
                 title: Response List Rules V1 Rules Get
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
       - rules
       summary: Create Rule
       operationId: create_rule_v1_rules_post
-      parameters:
-      - name: request
-        in: query
-        required: true
-        schema:
-          title: Request
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/RoutingRuleCreate'
+        required: true
       responses:
         '201':
           description: Successful Response
@@ -234,11 +216,6 @@ paths:
         schema:
           type: string
           title: Rule Id
-      - name: request
-        in: query
-        required: true
-        schema:
-          title: Request
       responses:
         '200':
           description: Successful Response
@@ -264,11 +241,6 @@ paths:
         schema:
           type: string
           title: Rule Id
-      - name: request
-        in: query
-        required: true
-        schema:
-          title: Request
       responses:
         '204':
           description: Successful Response
@@ -321,11 +293,29 @@ components:
         subject:
           type: string
           title: Subject
-        instances:
-          items:
-            $ref: '#/components/schemas/InstanceInfo'
-          type: array
-          title: Instances
+        base_url:
+          type: string
+          title: Base Url
+        capability:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Capability
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        auth_header:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auth Header
+        auth_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auth Token
         endpoints:
           items:
             $ref: '#/components/schemas/EndpointSpec'
@@ -344,7 +334,11 @@ components:
       - agent_id
       - name
       - subject
-      - instances
+      - base_url
+      - capability
+      - description
+      - auth_header
+      - auth_token
       - endpoints
       - created_at
       - updated_at
@@ -360,6 +354,21 @@ components:
         subject:
           type: string
           title: Subject
+        capability:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Capability
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        auth_header:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auth Header
         created_at:
           type: string
           format: date-time
@@ -369,6 +378,9 @@ components:
       - agent_id
       - name
       - subject
+      - capability
+      - description
+      - auth_header
       - created_at
       title: AgentListItem
     AgentMode:
@@ -394,12 +406,34 @@ components:
           maxLength: 255
           minLength: 1
           title: Subject
-        instances:
-          items:
-            $ref: '#/components/schemas/InstanceInfo'
-          type: array
-          minItems: 1
-          title: Instances
+        base_url:
+          type: string
+          maxLength: 2048
+          minLength: 1
+          title: Base Url
+        capability:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Capability
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        auth_header:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Auth Header
+        auth_token:
+          anyOf:
+          - type: string
+            maxLength: 2048
+          - type: 'null'
+          title: Auth Token
         endpoints:
           items:
             $ref: '#/components/schemas/EndpointSpec'
@@ -411,7 +445,7 @@ components:
       - agent_id
       - name
       - subject
-      - instances
+      - base_url
       - endpoints
       title: AgentRegistration
     AgentRegistrationResponse:
@@ -434,9 +468,9 @@ components:
       title: AgentRegistrationResponse
     EndpointSpec:
       properties:
-        endpoint_id:
+        endpoint_type:
           type: string
-          title: Endpoint Id
+          title: Endpoint Type
         method:
           $ref: '#/components/schemas/HTTPMethod'
         path:
@@ -466,11 +500,6 @@ components:
           type: boolean
           title: Idempotent
           default: false
-        operation_types:
-          items:
-            type: string
-          type: array
-          title: Operation Types
         param_mapping:
           $ref: '#/components/schemas/ParamMapping'
         session_config:
@@ -479,7 +508,7 @@ components:
           - type: 'null'
       type: object
       required:
-      - endpoint_id
+      - endpoint_type
       - method
       - path
       - mode
@@ -502,27 +531,6 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
-    InstanceInfo:
-      properties:
-        instance_id:
-          type: string
-          title: Instance Id
-        base_url:
-          type: string
-          maxLength: 2048
-          minLength: 1
-          title: Base Url
-        weight:
-          type: integer
-          maximum: 100.0
-          minimum: 1.0
-          title: Weight
-          default: 1
-      type: object
-      required:
-      - instance_id
-      - base_url
-      title: InstanceInfo
     ParamMapping:
       properties:
         path_params:
@@ -595,11 +603,24 @@ components:
           type: object
           title: When Clause
         target_agent_id:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Target Agent Id
+        target_capability:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Capability
+        target_endpoint_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Endpoint Type
         target_instance_id:
           type: string
           title: Target Instance Id
+          default: default
         enabled:
           type: boolean
           title: Enabled
@@ -609,8 +630,6 @@ components:
       - rule_id
       - priority
       - when_clause
-      - target_agent_id
-      - target_instance_id
       title: RoutingRuleCreate
     RoutingRuleDetail:
       properties:
@@ -625,8 +644,20 @@ components:
           type: object
           title: When Clause
         target_agent_id:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Target Agent Id
+        target_capability:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Capability
+        target_endpoint_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Endpoint Type
         target_instance_id:
           type: string
           title: Target Instance Id
@@ -643,6 +674,8 @@ components:
       - priority
       - when_clause
       - target_agent_id
+      - target_capability
+      - target_endpoint_type
       - target_instance_id
       - enabled
       - created_at

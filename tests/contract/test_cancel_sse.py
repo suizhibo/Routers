@@ -6,9 +6,9 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
-import httpx
+import aiohttp
 import pytest
 
 from agent_routers.services.forwarder import Forwarder
@@ -23,28 +23,30 @@ def _build_forwarder() -> Forwarder:
 
 
 def _stream_client(chunks: list[bytes], chunk_gate: asyncio.Event | None = None) -> MagicMock:
-    """Build a mock httpx.AsyncClient whose .stream() yields the given chunks.
+    """Build a mock aiohttp.ClientSession whose .request() yields the given chunks
+    via response.content.iter_any().
 
     If chunk_gate is provided, the generator awaits it between every chunk so
     the test can interleave a cancel between yields.
     """
     upstream = MagicMock()
 
-    async def aiter_bytes():
+    async def aiter_any():
         for chunk in chunks:
             if chunk_gate is not None:
                 await chunk_gate.wait()
                 chunk_gate.clear()
             yield chunk
 
-    upstream.aiter_bytes = aiter_bytes
+    upstream.content = MagicMock()
+    upstream.content.iter_any = aiter_any
 
     @asynccontextmanager
-    async def stream_cm(*_a, **_kw):
+    async def request_cm(*_a, **_kw):
         yield upstream
 
-    client = MagicMock(spec=httpx.AsyncClient)
-    client.stream = stream_cm
+    client = MagicMock(spec=aiohttp.ClientSession)
+    client.request = request_cm
     return client
 
 
@@ -129,18 +131,19 @@ async def test_stream_propagates_cancelled_error():
     forwarder = _build_forwarder()
 
     @asynccontextmanager
-    async def stream_cm(*_a, **_kw):
+    async def request_cm(*_a, **_kw):
         upstream = MagicMock()
 
-        async def aiter_bytes():
+        async def aiter_any():
             yield b"only"
             await asyncio.sleep(60)  # long enough to be cancelled
 
-        upstream.aiter_bytes = aiter_bytes
+        upstream.content = MagicMock()
+        upstream.content.iter_any = aiter_any
         yield upstream
 
-    client = MagicMock(spec=httpx.AsyncClient)
-    client.stream = stream_cm
+    client = MagicMock(spec=aiohttp.ClientSession)
+    client.request = request_cm
 
     response = await forwarder._forward_stream(
         client=client,

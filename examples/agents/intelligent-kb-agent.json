@@ -5,7 +5,7 @@
   "capability": "knowledge-base",
   "description": "智能知识库智能体，支持知识库问答、网络搜索和多轮对话",
   "auth_header": "x-api-key",
-  "auth_token": "your-api-key-here",
+  "auth_token": "sk-S7Q34lsRLiyvAWqLJQQrPS5lqm5ucd5Ck8xTpAYHlNYuS12f",
   "base_url": "http://localhost:8080/api/v1",
   "endpoints": [
     {
@@ -130,7 +130,7 @@
           "session_id": "context.session_id"
         },
         "query_params": {},
-        "body": "options"
+        "body": ""
       },
       "session_config": null
     },
