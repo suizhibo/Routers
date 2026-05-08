@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "agent-mode-when-tools-enabled",
+    "priority": 100,
+    "when_clause": {
+      "options.agent_enabled": true
+    },
+    "target_agent_id": "intelligent-kb-agent",
+    "enabled": true
+  }
+]
