@@ -1,38 +1,44 @@
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 
 from agent_routers.adapters.http_client import PerAgentClientPool, get_client_pool
 
 
-@pytest.fixture
-def pool():
+@pytest_asyncio.fixture
+async def pool():
     return PerAgentClientPool()
 
 
-def test_create_and_get(pool):
+@pytest.mark.asyncio
+async def test_create_and_get(pool):
     client = pool.create("agent-1", "http://localhost:8001")
     assert client is not None
     assert pool.get("agent-1") is client
 
 
-def test_create_duplicate_raises(pool):
+@pytest.mark.asyncio
+async def test_create_duplicate_raises(pool):
     pool.create("agent-1", "http://localhost:8001")
     with pytest.raises(ValueError, match="already exists"):
         pool.create("agent-1", "http://localhost:8002")
 
 
-def test_get_missing_returns_none(pool):
+@pytest.mark.asyncio
+async def test_get_missing_returns_none(pool):
     assert pool.get("nonexistent") is None
 
 
-def test_destroy_removes_client(pool):
+@pytest.mark.asyncio
+async def test_destroy_removes_client(pool):
     pool.create("agent-1", "http://localhost:8001")
     pool.destroy("agent-1")
     assert pool.get("agent-1") is None
 
 
-def test_destroy_missing_is_noop(pool):
+@pytest.mark.asyncio
+async def test_destroy_missing_is_noop(pool):
     pool.destroy("nonexistent")  # should not raise
 
 
@@ -45,8 +51,8 @@ async def test_close_all_closes_clients(pool):
 
     assert pool.get("agent-1") is None
     assert pool.get("agent-2") is None
-    assert client1.is_closed
-    assert client2.is_closed
+    assert client1.closed
+    assert client2.closed
 
 
 def test_get_client_pool_singleton():

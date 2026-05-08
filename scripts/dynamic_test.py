@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import asyncio
-import jwt
-import time
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import httpx
+import aiohttp
+import jwt
 
 BASE_URL = "http://localhost:8000"
 JWKS_URL = "http://localhost:8080/.well-known/jwks.json"
@@ -17,7 +17,9 @@ JWKS_URL = "http://localhost:8080/.well-known/jwks.json"
 PRIVATE_PEM = Path("/tmp/mock_jwks_private.pem").read_text()
 
 
-def make_token(sub: str = "test-user", role: str = "user", exp_offset: int = 3600) -> str:
+def make_token(
+    sub: str = "test-user", role: str = "user", exp_offset: int = 3600
+) -> str:
     now = int(time.time())
     return jwt.encode(
         {
@@ -51,23 +53,40 @@ def record(name: str, status: str, detail: str = ""):
 
 
 async def run_tests():
-    async with httpx.AsyncClient(base_url=BASE_URL, timeout=30) as client:
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(base_url=BASE_URL, timeout=timeout) as client:
         # ── Health / Public ──────────────────────────────────────────────
         print("\n--- Public Endpoints ---")
-        r = await client.get("/health")
-        record("GET /health", "PASS" if r.status_code == 200 else "FAIL", f"status={r.status_code}")
+        async with client.get("/health") as r:
+            record(
+                "GET /health",
+                "PASS" if r.status == 200 else "FAIL",
+                f"status={r.status}",
+            )
 
-        r = await client.get("/readiness")
-        record("GET /readiness", "PASS" if r.status_code == 200 else "FAIL", f"status={r.status_code}")
+        async with client.get("/readiness") as r:
+            record(
+                "GET /readiness",
+                "PASS" if r.status == 200 else "FAIL",
+                f"status={r.status}",
+            )
 
         # ── Auth required ────────────────────────────────────────────────
         print("\n--- Auth Required ---")
-        r = await client.get("/v1/agents")
-        record("GET /v1/agents no auth", "PASS" if r.status_code == 401 else "FAIL", f"status={r.status_code}")
+        async with client.get("/v1/agents") as r:
+            record(
+                "GET /v1/agents no auth",
+                "PASS" if r.status == 401 else "FAIL",
+                f"status={r.status}",
+            )
 
         user_token = make_token(sub="test-user", role="user")
         admin_token = make_token(sub="test-admin", role="admin")
         agent_token = make_token(sub="test-subject", role="user")
+
+        h_user = {"Authorization": f"Bearer {user_token}"}
+        h_admin = {"Authorization": f"Bearer {admin_token}"}
+        h_agent = {"Authorization": f"Bearer {agent_token}"}
 
         # ── Agents CRUD ──────────────────────────────────────────────────
         print("\n--- Agents CRUD ---")
@@ -84,7 +103,7 @@ async def run_tests():
                     "path": "/api/session",
                     "mode": "block",
                     "param_mapping": {"body": "input"},
-                    "session_config": {"response_header": "x-session-id"}
+                    "session_config": {"response_header": "x-session-id"},
                 },
                 {
                     "endpoint_id": "chat",
@@ -94,8 +113,8 @@ async def run_tests():
                     "mode": "stream",
                     "param_mapping": {
                         "path_params": {"session_id": "context.session_id"},
-                        "body": "input"
-                    }
+                        "body": "input",
+                    },
                 },
                 {
                     "endpoint_id": "terminate_session",
@@ -105,21 +124,37 @@ async def run_tests():
                     "mode": "block",
                     "param_mapping": {
                         "path_params": {"session_id": "context.session_id"}
-                    }
-                }
-            ]
+                    },
+                },
+            ],
         }
 
-        r = await client.post("/v1/agents", json=agent_payload, headers={"Authorization": f"Bearer {agent_token}"})
-        record("POST /v1/agents register", "PASS" if r.status_code == 201 else "FAIL", f"status={r.status_code}")
-        if r.status_code != 201:
-            print(f"    body: {r.text[:500]}")
+        async with client.post(
+            "/v1/agents", json=agent_payload, headers=h_agent
+        ) as r:
+            record(
+                "POST /v1/agents register",
+                "PASS" if r.status == 201 else "FAIL",
+                f"status={r.status}",
+            )
+            if r.status != 201:
+                print(f"    body: {(await r.text())[:500]}")
 
-        r = await client.get("/v1/agents", headers={"Authorization": f"Bearer {user_token}"})
-        record("GET /v1/agents list", "PASS" if r.status_code == 200 else "FAIL", f"status={r.status_code}")
+        async with client.get("/v1/agents", headers=h_user) as r:
+            record(
+                "GET /v1/agents list",
+                "PASS" if r.status == 200 else "FAIL",
+                f"status={r.status}",
+            )
 
-        r = await client.get("/v1/agents/test-agent-1", headers={"Authorization": f"Bearer {user_token}"})
-        record("GET /v1/agents/{id} detail", "PASS" if r.status_code == 200 else "FAIL", f"status={r.status_code}")
+        async with client.get(
+            "/v1/agents/test-agent-1", headers=h_user
+        ) as r:
+            record(
+                "GET /v1/agents/{id} detail",
+                "PASS" if r.status == 200 else "FAIL",
+                f"status={r.status}",
+            )
 
         # ── Rules CRUD (admin only) ──────────────────────────────────────
         print("\n--- Rules CRUD ---")
@@ -132,121 +167,184 @@ async def run_tests():
             "enabled": True,
         }
 
-        r = await client.post("/v1/rules", json=rule_payload, headers={"Authorization": f"Bearer {admin_token}"})
-        record("POST /v1/rules create", "PASS" if r.status_code == 201 else "FAIL", f"status={r.status_code}")
-        if r.status_code != 201:
-            print(f"    body: {r.text[:500]}")
+        async with client.post(
+            "/v1/rules", json=rule_payload, headers=h_admin
+        ) as r:
+            record(
+                "POST /v1/rules create",
+                "PASS" if r.status == 201 else "FAIL",
+                f"status={r.status}",
+            )
+            if r.status != 201:
+                print(f"    body: {(await r.text())[:500]}")
 
-        r = await client.get("/v1/rules", headers={"Authorization": f"Bearer {admin_token}"})
-        record("GET /v1/rules list", "PASS" if r.status_code == 200 else "FAIL", f"status={r.status_code}")
+        async with client.get("/v1/rules", headers=h_admin) as r:
+            record(
+                "GET /v1/rules list",
+                "PASS" if r.status == 200 else "FAIL",
+                f"status={r.status}",
+            )
 
-        r = await client.get("/v1/rules/rule-1", headers={"Authorization": f"Bearer {admin_token}"})
-        record("GET /v1/rules/{id} detail", "PASS" if r.status_code == 200 else "FAIL", f"status={r.status_code}")
+        async with client.get(
+            "/v1/rules/rule-1", headers=h_admin
+        ) as r:
+            record(
+                "GET /v1/rules/{id} detail",
+                "PASS" if r.status == 200 else "FAIL",
+                f"status={r.status}",
+            )
 
         # non-admin should be 403
-        r = await client.get("/v1/rules", headers={"Authorization": f"Bearer {user_token}"})
-        record("GET /v1/rules non-admin", "PASS" if r.status_code == 403 else "FAIL", f"status={r.status_code}")
+        async with client.get("/v1/rules", headers=h_user) as r:
+            record(
+                "GET /v1/rules non-admin",
+                "PASS" if r.status == 403 else "FAIL",
+                f"status={r.status}",
+            )
 
         # ── Route Forwarding (POST /v1/route, no path params) ────────────
         print("\n--- Route Forwarding (v2) ---")
 
         # 1. No auth should 401
-        route_payload = {"input": "hello", "context": {"operation": "chat"}, "options": {}}
-        r = await client.post("/v1/route", json=route_payload)
-        record("POST /v1/route no auth", "PASS" if r.status_code == 401 else "FAIL", f"status={r.status_code}")
+        route_payload = {
+            "input": "hello",
+            "context": {"operation": "chat"},
+            "options": {},
+        }
+        async with client.post("/v1/route", json=route_payload) as r:
+            record(
+                "POST /v1/route no auth",
+                "PASS" if r.status == 401 else "FAIL",
+                f"status={r.status}",
+            )
 
         # 2. L4: Operation match (context.operation -> endpoint)
         # Since there's no real agent backend, expect 502/504 (unreachable)
-        r = await client.post("/v1/route", json=route_payload, headers={"Authorization": f"Bearer {user_token}"})
-        record(
-            "POST /v1/route L4 operation match",
-            "PASS" if r.status_code in (200, 502, 504) else "FAIL",
-            f"status={r.status_code}",
-        )
-        if r.status_code not in (200, 502, 504):
-            print(f"    body: {r.text[:500]}")
+        async with client.post(
+            "/v1/route", json=route_payload, headers=h_user
+        ) as r:
+            record(
+                "POST /v1/route L4 operation match",
+                "PASS" if r.status in (200, 502, 504) else "FAIL",
+                f"status={r.status}",
+            )
+            if r.status not in (200, 502, 504):
+                print(f"    body: {(await r.text())[:500]}")
 
         # 3. L1: Preferred header overrides
-        r = await client.post(
+        async with client.post(
             "/v1/route",
             json=route_payload,
             headers={
-                "Authorization": f"Bearer {user_token}",
+                **h_user,
                 "X-Preferred-Agent": "test-agent-1",
                 "X-Preferred-Endpoint": "chat",
             },
-        )
-        record(
-            "POST /v1/route L1 preferred header",
-            "PASS" if r.status_code in (200, 502, 504) else "FAIL",
-            f"status={r.status_code}",
-        )
+        ) as r:
+            record(
+                "POST /v1/route L1 preferred header",
+                "PASS" if r.status in (200, 502, 504) else "FAIL",
+                f"status={r.status}",
+            )
 
         # 4. L3: Rule match (header.region = us-east)
-        r = await client.post(
+        async with client.post(
             "/v1/route",
             json=route_payload,
-            headers={
-                "Authorization": f"Bearer {user_token}",
-                "region": "us-east",
-            },
-        )
-        record(
-            "POST /v1/route L3 rule match",
-            "PASS" if r.status_code in (200, 502, 504) else "FAIL",
-            f"status={r.status_code}",
-        )
+            headers={**h_user, "region": "us-east"},
+        ) as r:
+            record(
+                "POST /v1/route L3 rule match",
+                "PASS" if r.status in (200, 502, 504) else "FAIL",
+                f"status={r.status}",
+            )
 
         # 5. L2: Session sticky (first request gets session_id, second uses it)
         # We simulate by setting a session config that would return a session_id
-        # Since backend is down, we can't test full flow, but we test cache miss -> operation match
-        r = await client.post(
+        # Since backend is down, we can't test full flow,
+        # but we test cache miss -> operation match
+        async with client.post(
             "/v1/route",
-            json={"input": "create", "context": {"operation": "create_session"}, "options": {}},
-            headers={"Authorization": f"Bearer {user_token}"},
-        )
-        record(
-            "POST /v1/route L4 create_session",
-            "PASS" if r.status_code in (200, 502, 504) else "FAIL",
-            f"status={r.status_code}",
-        )
+            json={
+                "input": "create",
+                "context": {"operation": "create_session"},
+                "options": {},
+            },
+            headers=h_user,
+        ) as r:
+            record(
+                "POST /v1/route L4 create_session",
+                "PASS" if r.status in (200, 502, 504) else "FAIL",
+                f"status={r.status}",
+            )
 
         # 6. Unknown operation should 404
-        r = await client.post(
+        async with client.post(
             "/v1/route",
-            json={"input": "???", "context": {"operation": "nonexistent"}, "options": {}},
-            headers={"Authorization": f"Bearer {user_token}"},
-        )
-        record(
-            "POST /v1/route unknown operation",
-            "PASS" if r.status_code == 404 else "FAIL",
-            f"status={r.status_code}",
-        )
+            json={
+                "input": "???",
+                "context": {"operation": "nonexistent"},
+                "options": {},
+            },
+            headers=h_user,
+        ) as r:
+            record(
+                "POST /v1/route unknown operation",
+                "PASS" if r.status == 404 else "FAIL",
+                f"status={r.status}",
+            )
 
         # ── Audit ────────────────────────────────────────────────────────
         print("\n--- Audit ---")
-        r = await client.get("/v1/audit/fake-request-id", headers={"Authorization": f"Bearer {admin_token}"})
-        record("GET /v1/audit/{request_id}", "PASS" if r.status_code in (200, 404) else "FAIL", f"status={r.status_code}")
+        async with client.get(
+            "/v1/audit/fake-request-id", headers=h_admin
+        ) as r:
+            record(
+                "GET /v1/audit/{request_id}",
+                "PASS" if r.status in (200, 404) else "FAIL",
+                f"status={r.status}",
+            )
 
         # ── Cancel ───────────────────────────────────────────────────────
         print("\n--- Cancel ---")
-        r = await client.post("/v1/requests/unknown-request/cancel", headers={"Authorization": f"Bearer {user_token}"})
-        record("POST /v1/requests/{id}/cancel", "PASS" if r.status_code in (200, 404) else "FAIL", f"status={r.status_code}")
+        async with client.post(
+            "/v1/requests/unknown-request/cancel", headers=h_user
+        ) as r:
+            record(
+                "POST /v1/requests/{id}/cancel",
+                "PASS" if r.status in (200, 404) else "FAIL",
+                f"status={r.status}",
+            )
 
         # ── Cleanup ──────────────────────────────────────────────────────
         print("\n--- Cleanup ---")
-        r = await client.delete("/v1/agents/test-agent-1", headers={"Authorization": f"Bearer {agent_token}"})
-        record("DELETE /v1/agents/{id}", "PASS" if r.status_code == 204 else "FAIL", f"status={r.status_code}")
+        async with client.delete(
+            "/v1/agents/test-agent-1", headers=h_agent
+        ) as r:
+            record(
+                "DELETE /v1/agents/{id}",
+                "PASS" if r.status == 204 else "FAIL",
+                f"status={r.status}",
+            )
 
-        r = await client.delete("/v1/rules/rule-1", headers={"Authorization": f"Bearer {admin_token}"})
-        record("DELETE /v1/rules/{id}", "PASS" if r.status_code == 204 else "FAIL", f"status={r.status_code}")
+        async with client.delete(
+            "/v1/rules/rule-1", headers=h_admin
+        ) as r:
+            record(
+                "DELETE /v1/rules/{id}",
+                "PASS" if r.status == 204 else "FAIL",
+                f"status={r.status}",
+            )
 
     # ── Summary ────────────────────────────────────────────────────────
     passed = sum(1 for r in results if r.status == "PASS")
     failed = sum(1 for r in results if r.status == "FAIL")
     skipped = sum(1 for r in results if r.status == "SKIP")
     print(f"\n{'='*50}")
-    print(f"Results: {passed} passed, {failed} failed, {skipped} skipped  ({len(results)} total)")
+    print(
+        f"Results: {passed} passed, {failed} failed, {skipped} skipped"
+        f"  ({len(results)} total)"
+    )
     if failed:
         print("\nFailed tests:")
         for r in results:

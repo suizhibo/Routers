@@ -1,13 +1,13 @@
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from starlette.testclient import TestClient
 
-from agent_routers.models import Base
-from agent_routers.api.routes_agents import router as agents_router
-from agent_routers.api.dependencies import get_auth, AuthContext, get_registry
-from agent_routers.services.registry import AgentRegistry
 from agent_routers.adapters.agent_repo import AgentRepository
+from agent_routers.api.dependencies import AuthContext, get_auth, get_registry
+from agent_routers.api.routes_agents import router as agents_router
+from agent_routers.models import Base
+from agent_routers.services.registry import AgentRegistry
 
 
 @pytest_asyncio.fixture
@@ -20,12 +20,11 @@ async def db_session():
     await engine.dispose()
 
 
-@pytest_asyncio.fixture
-async def client(db_session):
-    from fastapi import FastAPI
-
-    from fastapi import Request
+@pytest.fixture
+def client(db_session):
+    from fastapi import FastAPI, Request
     from fastapi.responses import JSONResponse
+
     from agent_routers.errors import AgentRoutersError
 
     app = FastAPI()
@@ -42,13 +41,11 @@ async def client(db_session):
     app.dependency_overrides[get_auth] = lambda: AuthContext(sub="svc-test", role=None)
     app.include_router(agents_router)
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    with TestClient(app) as tc:
+        yield tc
 
 
-@pytest.mark.asyncio
-async def test_register_agent(client):
+def test_register_agent(client):
     payload = {
         "agent_id": "weather-agent",
         "name": "Weather Agent",
@@ -68,20 +65,20 @@ async def test_register_agent(client):
             }
         ],
     }
-    resp = await client.post("/v1/agents", json=payload)
+    resp = client.post("/v1/agents", json=payload)
     assert resp.status_code == 201
     data = resp.json()
     assert data["agent_id"] == "weather-agent"
 
     # Verify detail includes new fields
-    resp = await client.get("/v1/agents/weather-agent")
+    resp = client.get("/v1/agents/weather-agent")
     assert resp.status_code == 200
     detail = resp.json()
     assert detail["capability"] == "weather"
     assert detail["description"] == "Provides weather forecasts"
 
     # Verify list includes new fields
-    resp = await client.get("/v1/agents")
+    resp = client.get("/v1/agents")
     assert resp.status_code == 200
     items = resp.json()
     assert len(items) == 1
@@ -89,8 +86,7 @@ async def test_register_agent(client):
     assert items[0]["description"] == "Provides weather forecasts"
 
 
-@pytest.mark.asyncio
-async def test_register_subject_mismatch(client):
+def test_register_subject_mismatch(client):
     payload = {
         "agent_id": "agent-1",
         "name": "Agent 1",
@@ -100,26 +96,23 @@ async def test_register_subject_mismatch(client):
             {"endpoint_type": "chat", "method": "GET", "path": "/", "mode": "block"}
         ],
     }
-    resp = await client.post("/v1/agents", json=payload)
+    resp = client.post("/v1/agents", json=payload)
     assert resp.status_code == 401
 
 
-@pytest.mark.asyncio
-async def test_list_agents_empty(client):
-    resp = await client.get("/v1/agents")
+def test_list_agents_empty(client):
+    resp = client.get("/v1/agents")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-@pytest.mark.asyncio
-async def test_get_agent_not_found(client):
-    resp = await client.get("/v1/agents/nonexistent")
+def test_get_agent_not_found(client):
+    resp = client.get("/v1/agents/nonexistent")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "agent_not_found"
 
 
-@pytest.mark.asyncio
-async def test_register_agent_with_auth(client):
+def test_register_agent_with_auth(client):
     payload = {
         "agent_id": "auth-agent",
         "name": "Auth Agent",
@@ -139,18 +132,18 @@ async def test_register_agent_with_auth(client):
             }
         ],
     }
-    resp = await client.post("/v1/agents", json=payload)
+    resp = client.post("/v1/agents", json=payload)
     assert resp.status_code == 201
 
     # Detail masks token
-    resp = await client.get("/v1/agents/auth-agent")
+    resp = client.get("/v1/agents/auth-agent")
     assert resp.status_code == 200
     detail = resp.json()
     assert detail["auth_header"] == "x-api-key"
     assert detail["auth_token"] == "***"
 
     # List omits token
-    resp = await client.get("/v1/agents")
+    resp = client.get("/v1/agents")
     assert resp.status_code == 200
     items = resp.json()
     assert len(items) == 1

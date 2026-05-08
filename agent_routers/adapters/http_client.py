@@ -8,11 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class PerAgentClientPool:
-    CONNECTOR_KW = dict(
-        limit=50,
-        limit_per_host=20,
-        keepalive_timeout=60.0,
-    )
     TIMEOUT = aiohttp.ClientTimeout(
         sock_connect=2.0,
         sock_read=30.0,
@@ -25,9 +20,12 @@ class PerAgentClientPool:
     def create(self, agent_id: str, base_url: str) -> aiohttp.ClientSession:
         if agent_id in self._sessions:
             raise ValueError(f"Client for agent '{agent_id}' already exists")
-        connector = aiohttp.TCPConnector(**self.CONNECTOR_KW)
         session = aiohttp.ClientSession(
-            connector=connector,
+            connector=aiohttp.TCPConnector(
+                limit=50,
+                limit_per_host=20,
+                keepalive_timeout=60.0,
+            ),
             timeout=self.TIMEOUT,
         )
         self._sessions[agent_id] = session
