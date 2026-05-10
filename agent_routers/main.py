@@ -8,30 +8,31 @@ from typing import AsyncIterator
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from agent_routers.config.settings import settings
 from agent_routers.adapters.agent_repo import AgentRepository
 from agent_routers.adapters.audit_repo import AuditRepository
 from agent_routers.adapters.http_client import get_client_pool
+from agent_routers.adapters.request_repo import RequestTrackingRepository
 from agent_routers.adapters.rule_repo import RuleRepository
 from agent_routers.api.routes_agents import router as agents_router
+from agent_routers.api.routes_audit import router as audit_router
 from agent_routers.api.routes_cancel import router as cancel_router
 from agent_routers.api.routes_forward import router as forward_router
 from agent_routers.api.routes_health import router as health_router
-from agent_routers.api.routes_audit import router as audit_router
 from agent_routers.api.routes_rules import router as rules_router
+from agent_routers.config.settings import settings
 from agent_routers.errors import AgentRoutersError
+from agent_routers.middleware.audit import AuditMiddleware, audit_task_set
+from agent_routers.middleware.jwt_auth import JWTAuthMiddleware
+from agent_routers.middleware.quota import QuotaMiddleware
+from agent_routers.middleware.request_id import RequestIdMiddleware
+from agent_routers.services.coordination import init_coordination
 from agent_routers.services.forwarder import Forwarder
 from agent_routers.services.registry import AgentRegistry
 from agent_routers.services.routing import RoutingDecisionEngine
 from agent_routers.services.session_manager import SessionManager
 from agent_routers.services.signer import HmacSigner
-from agent_routers.services.coordination import init_coordination, get_registry
-from agent_routers.middleware.audit import AuditMiddleware, audit_task_set
-from agent_routers.middleware.jwt_auth import JWTAuthMiddleware
-from agent_routers.middleware.quota import QuotaMiddleware
-from agent_routers.middleware.request_id import RequestIdMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,7 @@ def _setup_middleware(app: FastAPI) -> None:
     repo = AuditRepository(session_factory)
     signer = HmacSigner()
     app.state.audit_repo = repo
+    app.state.request_repo = RequestTrackingRepository(session_factory)
     app.state.rule_repo = RuleRepository(session_factory)
     app.state.session_manager = SessionManager(settings.REDIS_URL)
     app.state.forwarder = Forwarder(
@@ -106,7 +108,12 @@ def _setup_middleware(app: FastAPI) -> None:
 
 
 def make_app() -> FastAPI:
-    app = FastAPI(title="AgentRouters", version="0.1.0", lifespan=lifespan, docs_url="/docs" if settings.DEV_MODE else None)
+    app = FastAPI(
+        title="AgentRouters",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url="/docs" if settings.DEV_MODE else None,
+    )
 
     @app.exception_handler(AgentRoutersError)
     async def agent_routers_error_handler(request: Request, exc: AgentRoutersError) -> JSONResponse:
@@ -115,7 +122,9 @@ def make_app() -> FastAPI:
         return JSONResponse(status_code=exc.status_code, content=body)
 
     @app.exception_handler(RequestValidationError)
-    async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    async def validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         return JSONResponse(
             status_code=400,
             content={

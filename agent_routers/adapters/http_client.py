@@ -35,9 +35,10 @@ class PerAgentClientPool:
     def get(self, agent_id: str) -> aiohttp.ClientSession | None:
         return self._sessions.get(agent_id)
 
-    def destroy(self, agent_id: str) -> None:
+    async def destroy(self, agent_id: str) -> None:
         session = self._sessions.pop(agent_id, None)
         if session is not None:
+            await session.close()
             logger.info("agent_client_destroyed", extra={"agent_id": agent_id})
 
     async def close_all(self) -> None:

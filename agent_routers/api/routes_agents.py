@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, status
 
-from agent_routers.api.dependencies import get_auth, get_registry
 from agent_routers.adapters.http_client import get_client_pool
+from agent_routers.api.dependencies import AuthContext, get_auth, get_registry
 from agent_routers.schemas.agent import (
     AgentDetail,
     AgentListItem,
@@ -11,7 +11,6 @@ from agent_routers.schemas.agent import (
     AgentRegistrationResponse,
 )
 from agent_routers.services.registry import AgentRegistry
-from agent_routers.api.dependencies import AuthContext
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
 
@@ -64,7 +63,6 @@ async def deregister_agent(
     agent_id: str,
     auth: AuthContext = Depends(get_auth),
     registry: AgentRegistry = Depends(get_registry),
-    response: Response = None,
 ) -> None:
-    get_client_pool().destroy(agent_id)
+    await get_client_pool().destroy(agent_id)
     await registry.deregister(agent_id, jwt_subject=auth.sub, is_admin=auth.is_admin)

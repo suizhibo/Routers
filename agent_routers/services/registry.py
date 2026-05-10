@@ -15,17 +15,21 @@ class AgentRegistry:
     def __init__(self, repo: AgentRepository):
         self._repo = repo
 
-    async def register(self, registration: AgentRegistration, jwt_subject: str) -> AgentRegistrationResponse:
-        # if registration.subject != jwt_subject:
-        #     raise SubjectMismatchError(
-        #         f"Registration subject '{registration.subject}' does not match JWT sub '{jwt_subject}'"
-        #     )
-        #
-        # existing_subject = await self._repo.get_subject(registration.agent_id)
-        # if existing_subject is not None and existing_subject != registration.subject:
-        #     raise AgentConflictError(
-        #         f"Agent '{registration.agent_id}' already registered with subject '{existing_subject}'"
-        #     )
+    async def register(
+        self, registration: AgentRegistration, jwt_subject: str
+    ) -> AgentRegistrationResponse:
+        if registration.subject != jwt_subject:
+            raise SubjectMismatchError(
+                f"Registration subject '{registration.subject}' does not match "
+                f"JWT sub '{jwt_subject}'"
+            )
+
+        existing_subject = await self._repo.get_subject(registration.agent_id)
+        if existing_subject is not None and existing_subject != registration.subject:
+            raise AgentConflictError(
+                f"Agent '{registration.agent_id}' already registered with subject "
+                f"'{existing_subject}'"
+            )
 
         agent = await self._repo.create(registration)
         return AgentRegistrationResponse(

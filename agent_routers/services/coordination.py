@@ -6,8 +6,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 import redis.asyncio as redis
-
-from agent_routers.config.settings import settings
+from redis.exceptions import RedisError
 
 logger = logging.getLogger(__name__)
 
@@ -16,17 +15,24 @@ CANCEL_KEY_TTL = 30
 
 
 class CancellationRegistry:
-    def __init__(self):
+    def __init__(self) -> None:
         self._events: dict[str, asyncio.Event] = {}
+
+    def start_tracking(self, request_id: str) -> asyncio.Event:
+        event = asyncio.Event()
+        self._events[request_id] = event
+        return event
+
+    def stop_tracking(self, request_id: str) -> None:
+        self._events.pop(request_id, None)
 
     @asynccontextmanager
     async def track(self, request_id: str) -> AsyncIterator[asyncio.Event]:
-        event = asyncio.Event()
-        self._events[request_id] = event
+        event = self.start_tracking(request_id)
         try:
             yield event
         finally:
-            self._events.pop(request_id, None)
+            self.stop_tracking(request_id)
 
     def cancel_local(self, request_id: str) -> bool:
         event = self._events.get(request_id)
@@ -61,8 +67,11 @@ class CancellationBroadcaster:
                 client.set(f"cancel:{request_id}", "1", ex=CANCEL_KEY_TTL),
             )
             logger.info("cancel_published", extra={"request_id": request_id})
-        except Exception as e:
-            logger.error("cancel_publish_failed", extra={"request_id": request_id, "error": str(e)})
+        except (RedisError, OSError) as e:
+            logger.error(
+                "cancel_publish_failed",
+                extra={"request_id": request_id, "error": str(e)},
+            )
             raise
 
     async def _listen(self, registry: CancellationRegistry) -> None:
@@ -75,13 +84,16 @@ class CancellationBroadcaster:
         try:
             while self._running:
                 try:
-                    message = await asyncio.wait_for(pubsub.get_message(ignore_subscribe_messages=True), timeout=1.0)
+                    message = await asyncio.wait_for(
+                        pubsub.get_message(ignore_subscribe_messages=True),
+                        timeout=1.0,
+                    )
                     if message is not None and message["type"] == "message":
                         request_id = message["data"]
                         registry.cancel_local(request_id)
                 except asyncio.TimeoutError:
                     continue
-                except Exception as e:
+                except (RedisError, OSError) as e:
                     logger.error("pubsub_listen_error", extra={"error": str(e)})
                     await asyncio.sleep(1)
         finally:
@@ -110,7 +122,7 @@ class CancellationBroadcaster:
         try:
             client = await self._ensure_client()
             return await client.exists(f"cancel:{request_id}") == 1
-        except Exception as e:
+        except (RedisError, OSError) as e:
             logger.warning("cancel_key_poll_failed", extra={"error": str(e)})
             return False
 
@@ -127,8 +139,11 @@ class CancelService:
             try:
                 await self._broadcaster.publish(request_id)
                 return True
-            except Exception as e:
-                logger.warning("broadcast_cancel_failed", extra={"request_id": request_id, "error": str(e)})
+            except (RedisError, OSError) as e:
+                logger.warning(
+                    "broadcast_cancel_failed",
+                    extra={"request_id": request_id, "error": str(e)},
+                )
         return False
 
 

@@ -34,6 +34,32 @@ def _body_digest(body_text: str) -> str:
     return hashlib.sha256(body_text.encode()).hexdigest()[:16]
 
 
+class _BoundedBodyCapture:
+    def __init__(self, limit: int):
+        self._limit = limit
+        self._buffer = bytearray()
+        self._truncated = False
+
+    def append(self, chunk: bytes) -> None:
+        if self._truncated:
+            return
+
+        remaining = self._limit - len(self._buffer)
+        if len(chunk) <= remaining:
+            self._buffer.extend(chunk)
+            return
+
+        if remaining > 0:
+            self._buffer.extend(chunk[:remaining])
+        self._truncated = True
+
+    def text(self) -> str:
+        body_text = bytes(self._buffer).decode("utf-8", errors="replace")
+        if self._truncated:
+            return body_text + TRUNCATION_MARKER
+        return body_text
+
+
 async def _safe_write_audit(repo: AuditRepository, event: dict) -> None:
     try:
         await repo.insert(event)
@@ -63,7 +89,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response_body_digest = _body_digest(response_body_text)
 
         latency_ms = int((time.time() - start_ms) * 1000)
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
         canonical = self._signer.canonical(
             request_id=request_id,
@@ -112,7 +138,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         is_stream = "text/event-stream" in content_type
 
         if is_stream:
-            collected_chunks: list[bytes] = []
+            body_capture = _BoundedBodyCapture(MAX_BODY_BYTES)
             stream_done = asyncio.Event()
             original_iterator = response.body_iterator
 
@@ -120,7 +146,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 try:
                     async for chunk in original_iterator:
                         if isinstance(chunk, bytes):
-                            collected_chunks.append(chunk)
+                            body_capture.append(chunk)
                         yield chunk
                 finally:
                     stream_done.set()
@@ -129,8 +155,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
             async def _write_stream_audit():
                 await stream_done.wait()
-                body_bytes = b"".join(collected_chunks)
-                response_body_text = _truncate_body(body_bytes)
+                response_body_text = body_capture.text()
                 await self._write_audit_event(
                     request_id=request_id,
                     start_ms=start_ms,

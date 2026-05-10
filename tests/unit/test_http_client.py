@@ -32,14 +32,15 @@ async def test_get_missing_returns_none(pool):
 
 @pytest.mark.asyncio
 async def test_destroy_removes_client(pool):
-    pool.create("agent-1", "http://localhost:8001")
-    pool.destroy("agent-1")
+    client = pool.create("agent-1", "http://localhost:8001")
+    await pool.destroy("agent-1")
     assert pool.get("agent-1") is None
+    assert client.closed
 
 
 @pytest.mark.asyncio
 async def test_destroy_missing_is_noop(pool):
-    pool.destroy("nonexistent")  # should not raise
+    await pool.destroy("nonexistent")  # should not raise
 
 
 @pytest.mark.asyncio
