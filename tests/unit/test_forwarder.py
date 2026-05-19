@@ -212,6 +212,8 @@ async def test_forward_block_success(pool):
     assert isinstance(response_out, Response)
     assert response_out.status_code == 200
     assert response_out.body == b'{"ok": true}'
+    assert response_out.headers["X-Preferred-Agent"] == "agent-1"
+    assert response_out.headers["X-Session-Id"] == "sess-123"
 
 
 @pytest.mark.asyncio

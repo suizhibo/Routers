@@ -325,7 +325,7 @@ class Forwarder:
         if endpoint.mode == "block":
             return await self._forward_block(
                 client, endpoint.method, full_url, upstream_headers, body_dict,
-                circuit_key,
+                circuit_key, agent_id, session_id,
             )
         else:
             return await self._forward_stream(
@@ -347,6 +347,8 @@ class Forwarder:
         headers: dict[str, Any],
         body: Any,
         circuit_key: str,
+        agent_id: str,
+        session_id: str,
     ) -> Response:
         kwargs: dict[str, Any] = {"headers": headers}
         if body is not None:
@@ -368,10 +370,14 @@ class Forwarder:
             await _cb.record_failure(circuit_key)
             raise AgentTimeoutError("Upstream agent read timed out") from exc
 
+        response_headers = _filter_headers(resp_headers)
+        response_headers["X-Preferred-Agent"] = agent_id
+        response_headers["X-Session-Id"] = session_id
+
         return Response(
             content=content,
             status_code=status,
-            headers=_filter_headers(resp_headers),
+            headers=response_headers,
         )
 
     async def _forward_stream(
