@@ -8,9 +8,10 @@
 |------|------|
 | **Base URL** | `http://<host>:8000` |
 | **认证方式** | JWT Bearer Token (`Authorization: Bearer <token>`) |
-| **Token 算法** | RS256，通过 JWKS 端点验证 |
+| **Token 算法** | 当前实现使用 `JWT_ALGORITHM` 配置，默认 `HS256`，密钥为 `JWT_SECRET` |
 | **Content-Type** | `application/json` |
 | **公共路径**（免认证） | `/health`, `/readiness`, `/docs`, `/openapi.json` |
+| **请求 ID** | 可传入 `X-Request-ID`；未传入时中台自动生成，并在响应头返回 |
 
 ### 1.2 JWT Token 要求
 
@@ -20,6 +21,8 @@
 |-------|------|
 | `sub` | 用户/Agent 主体标识，Agent 注册时的 `subject` 必须与此匹配 |
 | `role` | 可选。值为 `"admin"` 时可访问管理接口（`/v1/rules`, `/v1/audit`） |
+
+> 当前实现只校验 Token 签名和算法，不校验 `iss` / `aud`。
 
 ### 1.3 接口清单
 
@@ -47,11 +50,13 @@ HTTP/1.1 200 OK
 
 #### 1.3.2 Agent 管理（`/v1/agents`）
 
-##### `POST /v1/agents` — 注册/重新注册 Agent
+##### `POST /v1/agents` — 注册 Agent
 
-注册一个新 Agent 到路由中台。注册后中台会为该 Agent 创建一个专用的 aiohttp 连接池。
+注册一个新 Agent 到路由中台。注册后中台会为该 Agent 创建一个专用的 aiohttp 客户端会话。
 
-**认证**：需要 JWT Token（`sub` 应与 `subject` 匹配，当前版本中 subject 校验已注释掉）
+**认证**：需要 JWT Token，且 `sub` 必须与请求体中的 `subject` 匹配。
+
+**重复注册限制**：当前接口不支持覆盖式重新注册；相同 `agent_id` 应先注销后再注册。若 `agent_id` 已存在且 `subject` 不同，返回 `409 agent_conflict`。
 
 **请求体** (`AgentRegistration`)：
 
@@ -146,6 +151,7 @@ HTTP/1.1 200 OK
 **错误码**：
 - `409` — Agent 已存在且 subject 不匹配（`agent_conflict`）
 - `401` — Subject 不匹配（`auth_invalid`）
+- `400` — 请求体校验失败（`validation_error`）
 
 ---
 
@@ -226,6 +232,11 @@ HTTP/1.1 200 OK
 | `context` | object | 否 | 上下文数据，可包含 `session_id` 等 |
 | `options` | object | 否 | 可选参数 |
 
+字段默认值：
+- `input`: `""`
+- `context`: `{}`
+- `options`: `{}`
+
 **请求示例**：
 ```json
 {
@@ -242,7 +253,7 @@ HTTP/1.1 200 OK
 
 **响应**：
 
-- **Block 模式**：直接返回 Agent 上游响应的 status、body 和 headers（过滤掉 hop-by-hop headers）。
+- **Block 模式**：返回 Agent 上游响应的 status、body 和 headers（过滤掉 hop-by-hop headers），并附加 `X-Preferred-Agent` 与 `X-Session-Id`。
 - **Stream 模式**：返回 `text/event-stream`，响应头包含：
   - `X-Preferred-Agent`: 目标 Agent ID
   - `X-Session-Id`: 会话 ID
@@ -251,7 +262,9 @@ HTTP/1.1 200 OK
 - `404` — Agent 未找到（`agent_not_found`）
 - `404` — Endpoint 未找到（`endpoint_not_found`）
 - `502` — Agent 不可用 / 熔断器开启（`agent_unavailable`）
+- `504` — Agent 读取或建会话超时（`agent_timeout`）
 - `429` — 配额超限（`quota_exceeded`）
+- `503` — 配额服务不可用（`dependency_unavailable`）
 
 ---
 
@@ -389,10 +402,10 @@ HTTP/1.1 200 OK
 
 ##### `POST /v1/requests/{request_id}/cancel` — 取消正在执行的请求
 
-取消一个正在进行的流式请求。通过 Redis Pub/Sub 广播到所有中台实例。
+取消一个正在进行的请求，主要用于流式转发。通过 Redis Pub/Sub 广播到所有中台实例。
 
 **认证**：需要 JWT Token
-**权限**：仅请求创建者（`sub` 匹配审计记录中的 `user_subject`）或 admin 可操作。
+**权限**：仅请求创建者或 admin 可操作。非 admin 场景下，中台优先查询活动请求表；若未找到，再查询审计记录中的 `user_subject`。
 
 **响应** (`202 Accepted`)：
 ```json
@@ -416,7 +429,7 @@ HTTP/1.1 200 OK
 Agent 是中台路由的下游服务。Agent 需要：
 
 1. **注册到中台**：通过 `POST /v1/agents` 提供元数据和端点规范。
-2. **暴露标准端点**：至少实现 `chat` 和 `create_session` 端点。
+2. **暴露标准端点**：必须实现 `chat` 端点；需要无会话自动建会话能力时，还必须实现 `create_session` 端点。
 3. **接受中台转发**：中台通过 HTTP 将用户请求转发到 Agent，Agent 处理后将响应回传给中台。
 
 ### 2.2 Agent 必须实现的端点
@@ -459,9 +472,11 @@ Agent 是中台路由的下游服务。Agent 需要：
 
 ---
 
-#### 2.2.2 `create_session` 端点（可选但强烈推荐）
+#### 2.2.2 `create_session` 端点（按需必需）
 
 当用户请求中未携带 `session_id` 时，中台自动调用该端点创建新会话。
+
+如果中台路由到的 Agent 没有配置 `create_session` 端点，且 `RouteRequest.context.session_id` 为空，请求会失败并返回 `404 endpoint_not_found`。
 
 **端点规范示例**：
 ```json
@@ -613,6 +628,7 @@ Agent 可选择是否启用认证。注册时通过以下字段配置：
 2. 通过 `upstream.content.iter_any()` 逐 chunk 读取。
 3. 每收到一个 chunk，检查 `cancel_event.is_set()`。如果已取消，停止读取并断开连接。
 4. 将 chunk 通过 `StreamingResponse` 返回给客户端，`media_type="text/event-stream"`。
+5. 流式请求无固定读取超时；连接超时时间为 2 秒。
 
 **Agent 实现建议**：
 - 使用 `Content-Type: text/event-stream`
@@ -668,11 +684,13 @@ Agent 的流式响应可能被客户端取消。取消流程：
 | `agent_not_found` | 404 | Agent 未注册 | 路由无法找到目标 Agent |
 | `endpoint_not_found` | 404 | 端点未定义 | Agent 未配置 `chat` 端点 |
 | `agent_unavailable` | 502 | Agent 不可用 | 熔断器开启或 session 创建失败 |
+| `agent_timeout` | 504 | Agent 超时 | 上游读取超时或创建 session 时连接超时 |
 | `agent_conflict` | 409 | Agent 冲突 | 注册时 ID 已存在且 subject 不同 |
 | `auth_invalid` | 401 | 认证失败 | JWT 验证失败或缺失 Token |
 | `forbidden` | 403 | 权限不足 | 非 admin 访问管理接口 |
 | `validation_error` | 400 | 参数校验失败 | 请求体不符合 Schema |
 | `quota_exceeded` | 429 | 配额超限 | Redis 滑动窗口限流触发 |
+| `dependency_unavailable` | 503 | 依赖不可用 | Redis 配额检查失败 |
 | `internal_error` | 500 | 内部错误 | 未捕获的异常 |
 
 ---
@@ -748,3 +766,7 @@ te
 trailers
 host
 ```
+
+---
+
+*Last updated: 2026-05-19*
