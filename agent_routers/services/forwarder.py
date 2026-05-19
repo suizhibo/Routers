@@ -15,7 +15,12 @@ from starlette.responses import Response, StreamingResponse
 
 from agent_routers.adapters.agent_repo import AgentRepository
 from agent_routers.adapters.http_client import PerAgentClientPool
-from agent_routers.errors import AgentNotFoundError, AgentUnavailableError, EndpointNotFoundError
+from agent_routers.errors import (
+    AgentNotFoundError,
+    AgentTimeoutError,
+    AgentUnavailableError,
+    EndpointNotFoundError,
+)
 from agent_routers.models.agent import Agent, AgentEndpoint
 from agent_routers.schemas.route import RouteRequest
 from agent_routers.services.routing import RoutingDecisionEngine
@@ -128,6 +133,12 @@ def _serialize_body(value: Any) -> bytes:
 
 
 class Forwarder:
+    STREAM_TIMEOUT = aiohttp.ClientTimeout(
+        sock_connect=2.0,
+        sock_read=None,
+        total=None,
+    )
+
     def __init__(
         self,
         agent_repo: AgentRepository,
@@ -251,12 +262,15 @@ class Forwarder:
         if agent.auth_header and agent.auth_token:
             session_headers[agent.auth_header] = agent.auth_token
 
-        async with client.request(
-            endpoint.method, full_url,
-            headers=session_headers, json=body_dict,
-        ) as upstream:
-            upstream.raise_for_status()
-            session_id = await self._extract_session_id(upstream, endpoint)
+        try:
+            async with client.request(
+                endpoint.method, full_url,
+                headers=session_headers, json=body_dict,
+            ) as upstream:
+                upstream.raise_for_status()
+                session_id = await self._extract_session_id(upstream, endpoint)
+        except aiohttp.SocketTimeoutError as exc:
+            raise AgentTimeoutError("Upstream agent timed out while creating session") from exc
 
         if not session_id:
             raise AgentUnavailableError("Failed to extract session_id from create-session response")
@@ -338,17 +352,21 @@ class Forwarder:
         if body is not None:
             kwargs["json"] = body
 
-        async with client.request(method, url, **kwargs) as upstream:
-            status = upstream.status
-            content = await upstream.read()
-            resp_headers = dict(upstream.headers)
+        try:
+            async with client.request(method, url, **kwargs) as upstream:
+                status = upstream.status
+                content = await upstream.read()
+                resp_headers = dict(upstream.headers)
 
-            if 500 <= status <= 599:
-                await _cb.record_failure(circuit_key)
-            else:
-                await _cb.record_success(circuit_key)
+                if 500 <= status <= 599:
+                    await _cb.record_failure(circuit_key)
+                else:
+                    await _cb.record_success(circuit_key)
 
-            upstream.raise_for_status()
+                upstream.raise_for_status()
+        except aiohttp.SocketTimeoutError as exc:
+            await _cb.record_failure(circuit_key)
+            raise AgentTimeoutError("Upstream agent read timed out") from exc
 
         return Response(
             content=content,
@@ -370,6 +388,7 @@ class Forwarder:
         kwargs: dict[str, Any] = {"headers": headers}
         if body is not None:
             kwargs["json"] = body
+        kwargs["timeout"] = self.STREAM_TIMEOUT
 
         async def generator() -> AsyncIterator[bytes]:
             try:

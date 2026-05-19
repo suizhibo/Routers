@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 
 from agent_routers.adapters.http_client import PerAgentClientPool
-from agent_routers.errors import AgentNotFoundError, EndpointNotFoundError
+from agent_routers.errors import AgentNotFoundError, AgentTimeoutError, EndpointNotFoundError
 from agent_routers.models.agent import Agent, AgentEndpoint
 from agent_routers.schemas.route import RouteRequest
 from agent_routers.services.forwarder import Forwarder
@@ -316,6 +316,53 @@ async def test_forward_block_no_retry_on_4xx(pool):
         await fwd.forward(request, route_req, None)
 
     assert mock_session.request.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_forward_block_read_timeout_returns_agent_timeout(pool):
+    agent = _make_agent("block")
+    repo = FakeAgentRepo(agent)
+    engine = FakeRoutingEngine("agent-1")
+    fwd = Forwarder(repo, engine, pool)
+
+    timeout_response = _mock_response(status=200)
+    timeout_response.read = AsyncMock(side_effect=aiohttp.SocketTimeoutError("read timed out"))
+    cm_timeout = _request_cm_for(timeout_response)
+    mock_session = _mock_session(request_side_effect=lambda *a, **kw: cm_timeout())
+
+    pool.create("agent-1", "http://localhost:8001")
+    pool._sessions["agent-1"] = mock_session
+
+    request = _make_request()
+    route_req = RouteRequest(context={"session_id": "sess-123"})
+    with pytest.raises(AgentTimeoutError):
+        await fwd.forward(request, route_req, None)
+
+
+@pytest.mark.asyncio
+async def test_forward_stream_disables_socket_read_timeout(pool):
+    agent = _make_agent("stream")
+    repo = FakeAgentRepo(agent)
+    engine = FakeRoutingEngine("agent-1")
+    fwd = Forwarder(repo, engine, pool)
+
+    cm = _stream_cm_yielding([b"data: hello\n\n"])
+    mock_session = _mock_session(request_side_effect=lambda *a, **kw: cm())
+
+    pool.create("agent-1", "http://localhost:8001")
+    pool._sessions["agent-1"] = mock_session
+
+    request = _make_request()
+    route_req = RouteRequest(context={"session_id": "sess-123"})
+    response = await fwd.forward(request, route_req, None)
+    assert isinstance(response, StreamingResponse)
+
+    chunks = [chunk async for chunk in response.body_iterator]
+
+    timeout = mock_session.request.call_args.kwargs["timeout"]
+    assert chunks == [b"data: hello\n\n"]
+    assert isinstance(timeout, aiohttp.ClientTimeout)
+    assert timeout.sock_read is None
 
 
 @pytest.mark.asyncio

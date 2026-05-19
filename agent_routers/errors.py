@@ -42,3 +42,8 @@ class ValidationError(AgentRoutersError):
 class AgentUnavailableError(AgentRoutersError):
     code = "agent_unavailable"
     status_code = 502
+
+
+class AgentTimeoutError(AgentRoutersError):
+    code = "agent_timeout"
+    status_code = 504
